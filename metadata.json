@@ -1,0 +1,6 @@
+{
+  "name": "المنقذ الجامعي - منصة الخدمات الجامعية في العراق",
+  "description": "منصة طلب الخدمات الجامعية الأولى في العراق: تقارير، بحوث، عروض PowerPoint، تلخيص وتنسيق أكاديمي جاهز للتسليم.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

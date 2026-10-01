@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="50%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="50%" stop-color="#facc15"/>
+      <stop offset="100%" stop-color="#eab308"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background rounded squircle with padding for maskable safe-zone -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  
+  <!-- Outer glowing academic circle -->
+  <circle cx="256" cy="256" r="190" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="6" stroke-dasharray="12 8"/>
+  <circle cx="256" cy="256" r="172" fill="rgba(255,255,255,0.06)"/>
+
+  <!-- Academic Cap (Trog) -->
+  <g filter="url(#shadow)">
+    <!-- Cap top diamond -->
+    <polygon points="256,130 390,195 256,260 122,195" fill="url(#goldGrad)"/>
+    
+    <!-- Skull cap skull / base -->
+    <path d="M175,230 L175,285 C175,325 337,325 337,285 L337,230 C305,245 281,252 256,252 C231,252 207,245 175,230 Z" fill="#ffffff"/>
+    
+    <!-- Tassel string & drop -->
+    <path d="M256,195 Q385,215 395,285" fill="none" stroke="#fef08a" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="395" cy="295" r="9" fill="#facc15"/>
+    <rect x="391" y="295" width="8" height="22" rx="4" fill="#eab308"/>
+  </g>
+
+  <!-- Open Academic Book below -->
+  <g filter="url(#shadow)" transform="translate(0, 15)">
+    <!-- Left page -->
+    <path d="M256,365 C220,345 170,345 140,355 C132,357 128,365 128,373 L128,420 C128,426 134,432 140,430 C175,418 220,418 256,438 Z" fill="#ffffff" opacity="0.95"/>
+    <!-- Right page -->
+    <path d="M256,365 C292,345 342,345 372,355 C380,357 384,365 384,373 L384,420 C384,426 378,432 372,430 C337,418 292,418 256,438 Z" fill="#ffffff" opacity="0.95"/>
+    <!-- Center spine accent -->
+    <line x1="256" y1="365" x2="256" y2="440" stroke="#facc15" stroke-width="4" stroke-linecap="round"/>
+  </g>
+
+  <!-- Sparkle stars for excellence -->
+  <g fill="#fef08a">
+    <polygon points="120,130 124,142 136,146 124,150 120,162 116,150 104,146 116,142"/>
+    <polygon points="400,120 403,130 413,133 403,136 400,146 397,136 387,133 397,130"/>
+  </g>
+</svg>

@@ -259,6 +259,11 @@ export default function App() {
 
       {/* Main Content Area based on current view */}
       <main className="flex-1 pb-16">
+        {import.meta.env.VITE_STATIC_PREVIEW === 'true' && (
+          <div className="mx-3.5 mt-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-center text-xs font-bold leading-relaxed text-amber-950">
+            هذه نسخة عرض ثابتة. إنشاء الطلبات ولوحة الإدارة والدفع تحتاج إلى تشغيل الخادم وقاعدة البيانات، وهي غير متاحة على هذا الرابط حالياً.
+          </div>
+        )}
         
         {/* 1. HOME VIEW */}
         {activeView === 'home' && (

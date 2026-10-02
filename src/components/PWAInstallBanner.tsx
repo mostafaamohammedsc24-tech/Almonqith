@@ -36,7 +36,7 @@ export const PWAInstallBanner: React.FC<PWAInstallBannerProps> = ({ onOpenInstal
       
       <div className="flex items-center gap-2.5 min-w-0">
         <div className="w-8 h-8 rounded-xl bg-white/10 text-white flex items-center justify-center shrink-0 border border-white/20 p-1">
-          <img src="/icon.svg" alt="App Icon" className="w-6 h-6" />
+          <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="App Icon" className="w-6 h-6" />
         </div>
         
         <div className="min-w-0">

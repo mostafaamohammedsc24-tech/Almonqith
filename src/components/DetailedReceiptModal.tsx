@@ -165,7 +165,7 @@ ${order.additionalFees?.length ? `• الإضافات: ${order.additionalFees.m
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b-2 border-dashed border-slate-200 dark:border-slate-800">
             <div className="flex items-center gap-3">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-800 to-blue-600 flex items-center justify-center p-2.5 shadow-md text-white">
-                <img src="/icon.svg" alt="شعار المنقذ" className="w-full h-full" />
+                <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="شعار المنقذ" className="w-full h-full" />
               </div>
               <div>
                 <div className="flex items-center gap-1.5">

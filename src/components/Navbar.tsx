@@ -49,7 +49,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           className="flex items-center gap-1.5 cursor-pointer active:scale-98 transition-transform select-none shrink-0"
         >
           <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-800 to-blue-600 flex items-center justify-center text-white shadow-xs p-1">
-            <img src="/icon.svg" alt="Logo" className="w-6 h-6" />
+            <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="Logo" className="w-6 h-6" />
           </div>
           <div>
             <div className="flex items-center gap-1 leading-none">

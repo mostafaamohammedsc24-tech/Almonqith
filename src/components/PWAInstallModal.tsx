@@ -84,7 +84,7 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClos
         {/* App Hero Badge */}
         <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row items-center gap-4 text-center sm:text-right">
           <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-blue-800 to-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-700/25 p-3 shrink-0">
-            <img src="/icon.svg" alt="المنقذ الجامعي" className="w-full h-full drop-shadow" />
+            <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="المنقذ الجامعي" className="w-full h-full drop-shadow" />
           </div>
           <div>
             <div className="flex items-center justify-center sm:justify-start gap-2">

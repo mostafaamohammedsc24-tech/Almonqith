@@ -5,7 +5,10 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
+  const basePath = process.env.GITHUB_ACTIONS === 'true' ? '/Almonqith/' : '/';
+
   return {
+    base: basePath,
     plugins: [
       react(),
       tailwindcss(),
@@ -13,32 +16,32 @@ export default defineConfig(() => {
         registerType: 'autoUpdate',
         includeAssets: ['apple-touch-icon.png', 'icon.svg'],
         manifest: {
-          id: '/',
+          id: basePath,
           name: 'المنقذ الجامعي - خدمات الطلاب والتقارير',
           short_name: 'المنقذ',
           description: 'المنصة الجامعية الأولى في العراق لإعداد التقارير والبحوث والعروض التقديمية واستلامها جاهزة بأعلى معايير الجودة.',
           theme_color: '#1d4ed8',
           background_color: '#0f172a',
           display: 'standalone',
-          start_url: '/',
-          scope: '/',
+          start_url: basePath,
+          scope: basePath,
           dir: 'rtl',
           lang: 'ar',
           icons: [
             {
-              src: '/pwa-192x192.png',
+              src: `${basePath}pwa-192x192.png`,
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/pwa-512x512.png',
+              src: `${basePath}pwa-512x512.png`,
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/pwa-maskable-512x512.png',
+              src: `${basePath}pwa-maskable-512x512.png`,
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable',

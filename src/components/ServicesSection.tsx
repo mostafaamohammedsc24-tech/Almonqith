@@ -56,6 +56,10 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
           </p>
         </div>
 
+        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-center text-xs font-bold leading-relaxed text-emerald-900">
+          استنساخ مجاني لبعض الجامعات، مع إيصال النسخ إلى الجامعة عبر مكاتبها تلقائياً.
+        </div>
+
         {/* Category Horizontal Filter Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none -mx-1 px-1">
           {categories.map(cat => {

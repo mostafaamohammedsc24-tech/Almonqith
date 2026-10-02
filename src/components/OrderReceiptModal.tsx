@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getWhatsAppUrl } from '../utils/links';
 import { 
   FileText, 
   X, 
@@ -40,11 +41,11 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
 
   const receiptNumber = `REC-${order.orderNumber.replace(/[^0-9]/g, '') || Date.now().toString().slice(-6)}`;
   const isPaid = order.paymentStatus === 'paid';
-  const payMethodTitle = order.paymentMethod === 'stripe_online' ? 'منصة Stripe العالمية (دفع بالبطاقة)' : 'محفظة زين كاش (ZainCash)';
+  const payMethodTitle = 'بوابة Wayl (غير مفعّلة بعد)';
 
   const handleCopyReceipt = () => {
     const text = 
-`🧾 وصل استلام وتسديد إلكتروني - المنقذ الجامعي
+`🧾 ملخص الطلب - المنقذ الجامعي
 ━━━━━━━━━━━━━━━━━━━
 رقم الوصل: ${receiptNumber}
 رقم الطلب المرجعي: ${order.orderNumber}
@@ -62,12 +63,13 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
 ⏳ موعد التسليم: ${order.deadlineDisplay}
 ━━━━━━━━━━━━━━━━━━━
 💰 المبلغ الإجمالي: ${formatIqd(order.totalPriceIqd)}
+${order.additionalFees?.length ? `الإضافات: ${order.additionalFees.map(fee => `${fee.label} (${formatIqd(fee.amountIqd)})`).join('، ')}` : ''}
 💳 وسيلة الدفع: ${payMethodTitle}
-حالة السداد: ${isPaid ? 'مدفوع بالكامل ومؤكد ✅' : 'بانتظار الدفع ⏳'}
+حالة السداد: ${isPaid ? 'تم تأكيده من الإدارة ✅' : 'بانتظار تأكيد الإدارة ⏳'}
 المرجع المالي: ${order.paymentReference || '---'}
 ━━━━━━━━━━━━━━━━━━━
-🔒 ضمان الجودة: تعديل مجاني مضمون وفحص استلال أكاديمي معتمد.
-منصة المنقذ الجامعي - العراق (07740080310)`;
+الإضافات: ${order.additionalFees?.map(fee => `${fee.label}: ${formatIqd(fee.amountIqd)}`).join('، ') || 'لا توجد'}
+منصة المنقذ الجامعي`;
 
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -83,7 +85,7 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
 المبلغ: ${formatIqd(order.totalPriceIqd)} (${isPaid ? 'مدفوع بالكامل ✅' : 'بانتظار السداد'})
 الوسيلة: ${payMethodTitle}`;
 
-    window.open(`https://wa.me/9647740080310?text=${encodeURIComponent(text)}`, '_blank');
+    window.open(getWhatsAppUrl(text), '_blank');
   };
 
   const handlePrint = () => {
@@ -103,10 +105,10 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-black text-white font-['Cairo']">
-                وصل إلكتروني رسمي
+                ملخص الطلب
               </h3>
               <p className="text-[10px] text-blue-200">
-                توثيق الطلب والسداد المالي
+                تفاصيل الطلب والسداد المسجل
               </p>
             </div>
           </div>
@@ -167,7 +169,7 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                     {payMethodTitle}
                   </span>
                   <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                    مرجع: {order.paymentReference || 'معتمد آلياً'}
+                    مرجع: {order.paymentReference || 'لا يوجد'}
                   </span>
                 </div>
               </div>
@@ -237,6 +239,10 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                 <span>{formatIqd(order.basePriceIqd || order.totalPriceIqd)}</span>
               </div>
 
+              {(order.volumePriceIqd || 0) > 0 && <div className="flex items-center justify-between text-slate-600 dark:text-slate-400"><span>الصفحات / الشرائح الإضافية:</span><span>+{formatIqd(order.volumePriceIqd || 0)}</span></div>}
+              {(order.complexityFeeIqd || 0) > 0 && <div className="flex items-center justify-between text-slate-600 dark:text-slate-400"><span>زيادة المرحلة الأكاديمية:</span><span>+{formatIqd(order.complexityFeeIqd || 0)}</span></div>}
+              {(order.referencesFeeIqd || 0) > 0 && <div className="flex items-center justify-between text-slate-600 dark:text-slate-400"><span>المراجع:</span><span>+{formatIqd(order.referencesFeeIqd || 0)}</span></div>}
+
               {order.formattingFeeIqd ? (
                 <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
                   <span>رسوم التنسيق والتوثيق الأكاديمي:</span>
@@ -251,12 +257,24 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                 </div>
               ) : null}
 
-              {order.discountIqd ? (
+              {order.additionalFees?.map(fee => (
+                <div key={fee.id} className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                  <span>{fee.label}:</span>
+                  <span>+{formatIqd(fee.amountIqd)}</span>
+                </div>
+              ))}
+
+              {(order.flexibleDiscountIqd || 0) > 0 && (
+                <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400 font-bold"><span>خصم الموعد المرن:</span><span>-{formatIqd(order.flexibleDiscountIqd || 0)}</span></div>
+              )}
+
+              {order.discountIqd - (order.flexibleDiscountIqd || 0) > 0 ? (
                 <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400 font-bold">
-                  <span>الخصم المطبق ({order.couponCode || 'كوبون'}):</span>
-                  <span>-{formatIqd(order.discountIqd)}</span>
+                  <span>خصم الكوبون ({order.couponCode || 'غير محدد'}):</span>
+                  <span>-{formatIqd(order.discountIqd - (order.flexibleDiscountIqd || 0))}</span>
                 </div>
               ) : null}
+              {(order.pointsDiscountIqd || 0) > 0 && <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400 font-bold"><span>خصم النقاط:</span><span>-{formatIqd(order.pointsDiscountIqd || 0)}</span></div>}
 
               <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between text-sm font-black">
                 <span className="text-slate-900 dark:text-white">المبلغ النهائي الصافي:</span>

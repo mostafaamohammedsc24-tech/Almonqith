@@ -52,7 +52,8 @@ export type DeliverySpeed =
   | 'hours_48'   // خلال 48 ساعة
   | 'hours_24'   // خلال 24 ساعة
   | 'hours_12'   // خلال 12 ساعة
-  | 'hours_6';   // عاجل فائق السرعة (خلال 6 ساعات)
+  | 'hours_6'
+  | (string & {}); // إضافات مخصصة من الإدارة
 
 export type OrderStatus = 
   | 'awaiting_payment' // بانتظار الدفع
@@ -148,17 +149,23 @@ export interface Order {
   deadlineDate: string;
   deadlineDisplay: string;
   basePriceIqd: number;
+  volumePriceIqd?: number;
+  complexityFeeIqd?: number;
   formattingFeeIqd: number;
+  referencesFeeIqd?: number;
   urgencyFeeIqd: number;
+  flexibleDiscountIqd?: number;
+  pointsDiscountIqd?: number;
   discountIqd: number;
   totalPriceIqd: number;
+  additionalFees?: { id: string; label: string; amountIqd: number }[];
   couponCode?: string;
   pointsUsed?: number;
 
   // Payment
-  paymentMethod: 'zain_cash' | 'stripe_online';
+  paymentMethod: 'wayl_online';
   paymentStatus: 'paid' | 'pending' | 'refunded';
-  paymentReference?: string; // e.g. ZC-938210 or ch_stripe_3M82
+  paymentReference?: string;
   paidAt?: string;
   verificationCode?: string; // e.g. VRF-8392
 
@@ -209,6 +216,7 @@ export interface StudentProfile {
   dailyStreak?: number;
   lastCheckInDate?: string;
   referralCode?: string;
+  referredByCode?: string;
   isRegistered?: boolean;
 }
 

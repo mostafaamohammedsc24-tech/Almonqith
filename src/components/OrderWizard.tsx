@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { 
   ArrowLeft, 
   Check, 
-  Upload, 
   FileText, 
   Clock, 
   ShieldCheck, 
@@ -10,7 +9,6 @@ import {
   CreditCard, 
   MessageSquare, 
   Building2, 
-  Trash2, 
   Phone, 
   User, 
   BookOpen,
@@ -24,14 +22,14 @@ import {
   AcademicStage, 
   DeliverySpeed, 
   Order, 
-  OrderAttachment, 
   StudentProfile 
 } from '../types';
 import { ALL_SERVICES } from '../data/services';
 import { IRAQI_UNIVERSITIES } from '../data/universities';
-import { calculateOrderPrice, formatIqd, VALID_COUPONS, findCoupon, incrementCouponUsage } from '../utils/pricing';
+import { calculateOrderPrice, formatIqd, findCoupon, getAdminPricingConfig, incrementCouponUsage } from '../utils/pricing';
 import { addPointsTransaction, addNotification } from '../utils/storage';
 import { DetailedReceiptModal } from './DetailedReceiptModal';
+import { getWhatsAppUrl } from '../utils/links';
 
 interface OrderWizardProps {
   initialServiceId?: string;
@@ -85,30 +83,19 @@ export const OrderWizard: React.FC<OrderWizardProps> = ({
   );
   const [pageCount, setPageCount] = useState<number>(initialParsedData?.pageCount || 10);
   const [deliverySpeed, setDeliverySpeed] = useState<DeliverySpeed>((initialParsedData?.deliverySpeed as DeliverySpeed) || 'hours_24');
-  const [attachments, setAttachments] = useState<OrderAttachment[]>([]);
-  const [isUploading, setIsUploading] = useState<boolean>(false);
 
   // 10. كوبونات الخصم (مخفية تماماً عن الواجهة، يدخلها الطالب يدوياً إذا منحته الإدارة كوداً)
   const [couponCode, setCouponCode] = useState<string>('');
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
   const [appliedCouponLabel, setAppliedCouponLabel] = useState<string>('');
   const [couponError, setCouponError] = useState<string | null>(null);
+  const [selectedAdditionalFeeIds, setSelectedAdditionalFeeIds] = useState<string[]>([]);
 
   // 10.5 نقاط المكافأة والولاء
   const [usePointsDiscount, setUsePointsDiscount] = useState<boolean>(false);
 
-  // 11. الدفع الإلكتروني (متوفر فقط عبر زين كاش وعبر منصة Stripe العالمية)
-  const [paymentMethod, setPaymentMethod] = useState<'zain_cash' | 'stripe_online'>('zain_cash');
-  const [paymentStatusOption, setPaymentStatusOption] = useState<'pay_now' | 'pay_later'>('pay_now');
-  
-  // ZainCash Details
-  const [zainSenderRef, setZainSenderRef] = useState<string>('');
-  
-  // Stripe Card Simulation Details
-  const [cardNumber, setCardNumber] = useState<string>('');
-  const [cardExpiry, setCardExpiry] = useState<string>('');
-  const [cardCvc, setCardCvc] = useState<string>('');
-  const [stripeSimulatedSuccess, setStripeSimulatedSuccess] = useState<boolean>(false);
+  // Keep orders pending until Wayl's server-side integration is configured.
+  const paymentMethod: Order['paymentMethod'] = 'wayl_online';
 
   // Error validation state
   const [formError, setFormError] = useState<string | null>(null);
@@ -158,7 +145,9 @@ export const OrderWizard: React.FC<OrderWizardProps> = ({
     referenceCount: 6,
     couponCode: appliedCoupon || undefined,
     useLoyaltyPoints: usePointsDiscount ? (userProfile.loyaltyPoints || 0) : 0,
+    additionalFeeIds: selectedAdditionalFeeIds,
   });
+  const availableAdditionalFees = getAdminPricingConfig().additionalFees;
 
   const isFreeFromCoupon = priceData.totalPriceIqd === 0;
 
@@ -174,10 +163,6 @@ export const OrderWizard: React.FC<OrderWizardProps> = ({
       setAppliedCoupon(clean);
       setAppliedCouponLabel(adminCoupon.label || `خصم ${adminCoupon.discountPercent}%`);
       setCouponError(null);
-    } else if (VALID_COUPONS[clean]) {
-      setAppliedCoupon(clean);
-      setAppliedCouponLabel(VALID_COUPONS[clean].label);
-      setCouponError(null);
     } else {
       setAppliedCoupon(null);
       setAppliedCouponLabel('');
@@ -192,35 +177,12 @@ export const OrderWizard: React.FC<OrderWizardProps> = ({
     setCouponError(null);
   };
 
-  // Simulate file upload
-  const handleUploadFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    setIsUploading(true);
-    setTimeout(() => {
-      const newAtt: OrderAttachment = {
-        id: `att-${Date.now()}`,
-        name: files[0].name,
-        size: `${(files[0].size / (1024 * 1024)).toFixed(1)} MB`,
-        type: files[0].type || 'application/pdf',
-        uploadedAt: 'الآن',
-      };
-      setAttachments(prev => [...prev, newAtt]);
-      setIsUploading(false);
-    }, 500);
-  };
-
-  // Simulate Stripe Instant Payment
-  const handleSimulateStripePay = () => {
-    if (!cardNumber.trim() || !cardExpiry.trim() || !cardCvc.trim()) {
-      alert('يرجى إدخال بيانات البطاقة البنكية للمتابعة.');
+  // Submit and open WhatsApp with auto-filled message
+  const handleSubmitAndSendToWhatsApp = async () => {
+    if (!priceData.isUrgentFeasible) {
+      setFormError(priceData.unfeasibleReason || 'السرعة المختارة غير متاحة لهذه الخدمة.');
       return;
     }
-    setStripeSimulatedSuccess(true);
-  };
-
-  // Submit and open WhatsApp with auto-filled message
-  const handleSubmitAndSendToWhatsApp = () => {
     if (!title.trim()) {
       setFormError('يرجى كتابة عنوان التقرير أو العمل');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -239,9 +201,9 @@ export const OrderWizard: React.FC<OrderWizardProps> = ({
     setIsSubmitting(true);
 
     // High quality distinct Order Numbering
-    const randomSeq = Math.floor(10000 + Math.random() * 90000);
-    const orderNumber = `#MNQ-2026-${randomSeq}`;
-    const verificationCode = `VRF-${Math.floor(1000 + Math.random() * 9000)}`;
+    const randomValues = crypto.getRandomValues(new Uint32Array(2));
+    const orderNumber = `#MNQ-${new Date().getFullYear()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+    const verificationCode = `VRF-${1000 + (randomValues[1] % 9000)}`;
 
     let deadlineDisplay = 'خلال 24 ساعة (المعيار الطبيعي)';
     if (deliverySpeed === 'hours_6') deadlineDisplay = 'خلال 6 ساعات (عاجل اليوم)';
@@ -249,27 +211,21 @@ export const OrderWizard: React.FC<OrderWizardProps> = ({
     else if (deliverySpeed === 'hours_48') deadlineDisplay = 'أكثر من 48 ساعة (موعد مرن - خصم 25%)';
     else if (deliverySpeed === 'normal') deadlineDisplay = 'موعد مرن 3 - 5 أيام (خصم 25%)';
 
-    // Determine Payment Status and Reference
-    const isPaid = isFreeFromCoupon || (paymentStatusOption === 'pay_now' && (paymentMethod === 'zain_cash' || stripeSimulatedSuccess));
-
-    let paymentReference = '';
-    if (isFreeFromCoupon) {
-      paymentReference = `إعفاء بكوبون 100% (${appliedCoupon})`;
-    } else if (paymentMethod === 'zain_cash') {
-      paymentReference = zainSenderRef.trim() 
-        ? `حوالة زين كاش: ${zainSenderRef.trim()}` 
-        : (isPaid ? `حوالة زين كاش ZC-${randomSeq}` : 'بانتظار التحويل عبر زين كاش');
-    } else {
-      paymentReference = stripeSimulatedSuccess 
-        ? `STRIPE-CH-${randomSeq}` 
-        : (isPaid ? `STRIPE-TXN-${randomSeq}` : 'بانتظار إتمام السداد عبر Stripe');
-    }
+    const isPaid = false;
+    const paymentReference = 'بانتظار تفعيل بوابة Wayl';
 
     const stageArabic = stage === 'stage_1' ? 'الأولى' : stage === 'stage_2' ? 'الثانية' : stage === 'stage_3' ? 'الثالثة' : stage === 'stage_4' ? 'الرابعة' : 'الدراسات العليا';
-    const payMethodTitle = paymentMethod === 'stripe_online' ? 'منصة Stripe العالمية' : 'محفظة زين كاش (ZainCash)';
+    const payMethodTitle = 'بوابة Wayl (غير مفعّلة بعد)';
+    const deliveryHours: Record<string, number> = {
+      hours_6: 6,
+      hours_12: 12,
+      hours_24: 24,
+      hours_48: 48,
+      normal: 120,
+    };
 
     const newOrder: Order = {
-      id: `ord-${randomSeq}`,
+      id: `ord-${crypto.randomUUID()}`,
       orderNumber,
       verificationCode,
       createdAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
@@ -290,16 +246,22 @@ export const OrderWizard: React.FC<OrderWizardProps> = ({
       fileFormat: ['pdf', 'docx'],
       needsReferences: true,
       professorInstructions: professorInstructions.trim(),
-      attachments,
+      attachments: [],
       deliverableFiles: [],
       deliverySpeed,
-      deadlineDate: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+      deadlineDate: new Date(Date.now() + (deliveryHours[deliverySpeed] ?? 24) * 3600 * 1000).toISOString(),
       deadlineDisplay,
       basePriceIqd: priceData.basePriceIqd,
+      volumePriceIqd: priceData.volumePriceIqd,
+      complexityFeeIqd: priceData.complexityFeeIqd,
       formattingFeeIqd: priceData.formattingFeeIqd,
+      referencesFeeIqd: priceData.referencesFeeIqd,
       urgencyFeeIqd: priceData.urgencyFeeIqd,
+      flexibleDiscountIqd: priceData.flexibleDiscountIqd,
+      pointsDiscountIqd: priceData.pointsDiscountIqd,
       discountIqd: priceData.discountIqd,
       totalPriceIqd: priceData.totalPriceIqd,
+      additionalFees: priceData.additionalFees,
       couponCode: appliedCoupon || undefined,
       paymentMethod,
       paymentStatus: isPaid ? 'paid' : 'pending',
@@ -333,6 +295,39 @@ export const OrderWizard: React.FC<OrderWizardProps> = ({
       ],
       revisions: [],
     };
+
+    try {
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(newOrder),
+      });
+      let result: unknown;
+      try {
+        result = await response.json();
+      } catch {
+        result = null;
+      }
+      if (!response.ok) {
+        const errorMessage = typeof result === 'object' && result !== null &&
+          'error' in result && typeof result.error === 'string'
+          ? result.error
+          : 'تعذر حفظ الطلب على الخادم.';
+        throw new Error(errorMessage);
+      }
+      if (typeof result !== 'object' || result === null || !('id' in result) || result.id !== newOrder.id) {
+        throw new Error('استجابة حفظ الطلب من الخادم غير صالحة.');
+      }
+      Object.assign(newOrder, result);
+    } catch (error) {
+      console.error('Failed to persist order:', error);
+      setFormError(error instanceof Error
+        ? error.message
+        : 'تعذر حفظ الطلب على الخادم. يرجى المحاولة مجدداً.');
+      setIsSubmitting(false);
+      return;
+    }
 
     if (appliedCoupon) {
       incrementCouponUsage(appliedCoupon);
@@ -375,6 +370,7 @@ export const OrderWizard: React.FC<OrderWizardProps> = ({
 🔐 كود التحقق للمراجعة: ${verificationCode}
 💳 حالة السداد: ${isPaid ? `✅ مدفوع بالكامل (${payMethodTitle} - ${paymentReference})` : `⚠️ غير مدفوع (بانتظار السداد عبر ${payMethodTitle})`}
 💰 المبلغ المستحق: ${formatIqd(priceData.totalPriceIqd)} ${appliedCoupon ? `(كوبون مطبق: ${appliedCoupon})` : ''}
+${priceData.additionalFees.length ? `الإضافات: ${priceData.additionalFees.map(fee => `${fee.label} (${formatIqd(fee.amountIqd)})`).join('، ')}` : ''}
 ━━━━━━━━━━━━━━━
 📄 نوع الخدمة: ${selectedService.name}
 📝 عنوان العمل: ${title.trim()}
@@ -393,8 +389,7 @@ ${professorInstructions.trim() || 'لا توجد ملاحظات إضافية'}
 ⚠️ تنبيه: تم حفظ الطلب بالنظام برقم [${orderNumber}] لغرض المراجعة والتحقق والتدقيق الأكاديمي.
 يرجى تأكيد الاستلام والمباشرة بالعمل. شكراً لكم!`;
 
-    const encodedMsg = encodeURIComponent(waText);
-    const waUrl = `https://wa.me/9647740080310?text=${encodedMsg}`;
+    const waUrl = getWhatsAppUrl(waText);
 
     // Open WhatsApp
     window.open(waUrl, '_blank');
@@ -426,7 +421,7 @@ ${professorInstructions.trim() || 'لا توجد ملاحظات إضافية'}
         </div>
 
         <span className="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200/60">
-          واتساب: 07740080310
+          متابعة عبر واتساب
         </span>
       </div>
 
@@ -670,8 +665,8 @@ ${professorInstructions.trim() || 'لا توجد ملاحظات إضافية'}
               {[
                 { id: 'hours_48', label: 'أكثر من 48 ساعة (موعد مرن)', badge: 'خصم 25% فوري 🎉' },
                 { id: 'hours_24', label: 'خلال 24 ساعة (الحد الطبيعي)', badge: 'السعر الأساسي القياسي' },
-                { id: 'hours_12', label: 'خلال 12 ساعة (الليلة)', badge: '+8,000 د.ع مستعجل' },
-                { id: 'hours_6', label: 'خلال 6 ساعات (أقصى سرعة)', badge: '+15,000 د.ع فوري' },
+                { id: 'hours_12', label: 'خلال 12 ساعة (الليلة)', badge: '+25% رسوم استعجال' },
+                { id: 'hours_6', label: 'خلال 6 ساعات (أقصى سرعة)', badge: '+50% رسوم استعجال' },
               ].map(speed => (
                 <button
                   key={speed.id}
@@ -696,44 +691,32 @@ ${professorInstructions.trim() || 'لا توجد ملاحظات إضافية'}
                 </button>
               ))}
             </div>
-          </div>
-
-          {/* File Upload Attachment */}
-          <div className="mt-3 border-t border-slate-100 pt-2.5">
-            <label className="block font-bold text-slate-800 mb-1">
-              إرفاق ملف أو صورة من المحاضرة / ورقة الواجب (اختياري):
-            </label>
-            <label className="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition-colors bg-slate-50/50">
-              <Upload className="w-5 h-5 text-slate-400 mb-1" />
-              <span className="text-[11px] font-bold text-slate-700">
-                {isUploading ? 'جاري رفع الملف...' : 'انقر لرفع ملف PDF أو صورة أو Word'}
-              </span>
-              <input
-                type="file"
-                className="hidden"
-                accept=".pdf,.docx,.doc,.pptx,.png,.jpg,.jpeg"
-                onChange={handleUploadFile}
-              />
-            </label>
-
-            {attachments.length > 0 && (
-              <div className="mt-2 space-y-1">
-                {attachments.map(att => (
-                  <div key={att.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200 text-[11px]">
-                    <span className="font-semibold truncate max-w-[200px]">{att.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => setAttachments(attachments.filter(a => a.id !== att.id))}
-                      className="text-rose-500 hover:text-rose-700 cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
+            {!priceData.isUrgentFeasible && (
+              <p role="alert" className="mt-2 text-[11px] font-bold text-rose-700 dark:text-rose-300">{priceData.unfeasibleReason}</p>
             )}
           </div>
+
+          <p className="mt-3 border-t border-slate-100 pt-2.5 text-[11px] text-slate-500">أرسل الملفات كمرفقات في محادثة واتساب بعد فتحها؛ لا يتم رفع الملفات أو تخزينها في الموقع حالياً.</p>
         </div>
+
+        {availableAdditionalFees.length > 0 && (
+          <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2">
+            <h3 className="font-bold text-slate-900 dark:text-white text-xs">إضافات اختيارية</h3>
+            {availableAdditionalFees.map(fee => (
+              <label key={fee.id} className="flex items-center justify-between gap-3 p-2 rounded-lg bg-slate-50 dark:bg-slate-800 text-xs cursor-pointer">
+                <span className="flex items-center gap-2 text-slate-800 dark:text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={selectedAdditionalFeeIds.includes(fee.id)}
+                    onChange={event => setSelectedAdditionalFeeIds(current => event.target.checked ? [...current, fee.id] : current.filter(id => id !== fee.id))}
+                  />
+                  {fee.label}
+                </span>
+                <strong className="text-slate-700 dark:text-slate-300">+{formatIqd(fee.amountIqd)}</strong>
+              </label>
+            ))}
+          </div>
+        )}
 
         {/* 10. كوبون الخصم الخاص (مخفي تماماً عن الطلاب، يدخل يدوياً فقط إن منحته الإدارة) */}
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
@@ -820,184 +803,19 @@ ${professorInstructions.trim() || 'لا توجد ملاحظات إضافية'}
           </div>
         )}
 
-        {/* 11. الدفع الإلكتروني (متوفر حصراً عبر زين كاش وعبر منصة Stripe العالمية) */}
+        {/* Wayl payment status */}
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
           <div className="flex items-center justify-between">
             <label className="font-bold text-slate-900">
-              وسيلة الدفع الإلكتروني المعتمدة:
+              وسيلة الدفع:
             </label>
             <span className="text-[10px] text-slate-500 font-bold">
-              (زين كاش أو Stripe فقط)
+              Wayl
             </span>
           </div>
-
-          {/* Two Exclusive Payment Options */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setPaymentMethod('zain_cash')}
-              className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer flex flex-col items-center justify-center gap-1 ${
-                paymentMethod === 'zain_cash'
-                  ? 'bg-blue-700 text-white border-blue-700 shadow-xs'
-                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-              }`}
-            >
-              <span className="font-black">محفظة زين كاش</span>
-              <span className={`text-[9px] ${paymentMethod === 'zain_cash' ? 'text-blue-100' : 'text-slate-500'}`}>
-                ZainCash العراق (محفظة رقمية)
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setPaymentMethod('stripe_online')}
-              className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer flex flex-col items-center justify-center gap-1 ${
-                paymentMethod === 'stripe_online'
-                  ? 'bg-blue-700 text-white border-blue-700 shadow-xs'
-                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-              }`}
-            >
-              <span className="font-black">منصة Stripe العالمية</span>
-              <span className={`text-[9px] ${paymentMethod === 'stripe_online' ? 'text-blue-100' : 'text-slate-500'}`}>
-                دفع إلكتروني بالبطاقات الدولية
-              </span>
-            </button>
-          </div>
-
-          {/* Method 1: ZainCash Details & Verification Form */}
-          {paymentMethod === 'zain_cash' && (
-            <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl text-xs space-y-2.5">
-              <div className="flex items-center justify-between pb-2 border-b border-blue-200/80">
-                <span className="font-bold text-slate-800">رقم محفظة زين كاش للتحويل:</span>
-                <span className="font-mono font-black text-blue-800 dir-ltr text-sm select-all">
-                  0780 123 4567
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-600">
-                اسم الحساب: <strong>المنقذ الجامعي</strong> · المبلغ المطلوب تحويله: <strong>{formatIqd(priceData.totalPriceIqd)}</strong>
-              </p>
-
-              {/* Reference input so admin can review later */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-800 mb-1">
-                  رقم الحوالة أو رقم هاتف المحوّل للتحقق:
-                </label>
-                <input
-                  type="text"
-                  value={zainSenderRef}
-                  onChange={(e) => setZainSenderRef(e.target.value)}
-                  placeholder="مثال: حوالة من رقم 0780xxxxxxx أو كود ZC-8921"
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white font-medium"
-                />
-              </div>
-
-              {/* Payment timing option */}
-              <div className="pt-1 flex items-center gap-4 text-[11px]">
-                <label className="flex items-center gap-1.5 cursor-pointer font-bold text-blue-900">
-                  <input
-                    type="radio"
-                    name="zain_timing"
-                    checked={paymentStatusOption === 'pay_now'}
-                    onChange={() => setPaymentStatusOption('pay_now')}
-                    className="text-blue-600"
-                  />
-                  <span>تم التحويل وسداد المبلغ الآن</span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer text-slate-600 font-medium">
-                  <input
-                    type="radio"
-                    name="zain_timing"
-                    checked={paymentStatusOption === 'pay_later'}
-                    onChange={() => setPaymentStatusOption('pay_later')}
-                    className="text-blue-600"
-                  />
-                  <span>سأقوم بالتحويل لاحقاً</span>
-                </label>
-              </div>
-            </div>
-          )}
-
-          {/* Method 2: Stripe Global Checkout Simulator */}
-          {paymentMethod === 'stripe_online' && (
-            <div className="p-3.5 bg-slate-900 text-white border border-slate-700 rounded-xl text-xs space-y-2.5">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <div className="flex items-center gap-1.5">
-                  <CreditCard className="w-4 h-4 text-blue-400" />
-                  <span className="font-bold text-white">بوابة Stripe العالمية للبطاقات</span>
-                </div>
-                <span className="text-[10px] bg-blue-600/30 text-blue-300 px-2 py-0.5 rounded font-mono font-bold">
-                  Stripe SSL 256-bit
-                </span>
-              </div>
-
-              {stripeSimulatedSuccess ? (
-                <div className="p-3 bg-emerald-950/80 border border-emerald-600 rounded-xl text-emerald-300 text-xs flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-                  <span>
-                    تم تأكيد بطاقتك بنجاح عبر Stripe! سيتم تسجيل الطلب كـ <strong>«مدفوع بالكامل»</strong>.
-                  </span>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div>
-                    <label className="block text-[10px] text-slate-400 mb-1">
-                      رقم البطاقة (Visa / Mastercard):
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={19}
-                      value={cardNumber}
-                      onChange={(e) => setCardNumber(e.target.value)}
-                      placeholder="4000 1234 5678 9010"
-                      className="w-full px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white font-mono text-xs dir-ltr focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[10px] text-slate-400 mb-1">
-                        تاريخ الانتهاء (MM/YY):
-                      </label>
-                      <input
-                        type="text"
-                        maxLength={5}
-                        value={cardExpiry}
-                        onChange={(e) => setCardExpiry(e.target.value)}
-                        placeholder="12/28"
-                        className="w-full px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white font-mono text-xs text-center dir-ltr focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-slate-400 mb-1">
-                        رمز الأمان (CVC):
-                      </label>
-                      <input
-                        type="password"
-                        maxLength={4}
-                        value={cardCvc}
-                        onChange={(e) => setCardCvc(e.target.value)}
-                        placeholder="123"
-                        className="w-full px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white font-mono text-xs text-center dir-ltr focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleSimulateStripePay}
-                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <Lock className="w-3.5 h-3.5" />
-                    <span>تأكيد وسداد {formatIqd(priceData.totalPriceIqd)} عبر Stripe الآن</span>
-                  </button>
-                </div>
-              )}
-
-              <p className="text-[10px] text-slate-400">
-                تدعم منصة Stripe كافة البطاقات البنكية الدولية الصادرة في العراق والعالم بأمان تام.
-              </p>
-            </div>
-          )}
+          <p className="text-xs text-amber-800">
+            بوابة Wayl غير مفعّلة بعد. لن يُحصّل أي مبلغ ولن يُعد الطلب مدفوعاً قبل ربط الخادم والتحقق من إشعار الدفع.
+          </p>
 
           {/* Mandatory Deliver Notice */}
           <div className="p-3 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-950 text-xs">
@@ -1053,7 +871,7 @@ ${professorInstructions.trim() || 'لا توجد ملاحظات إضافية'}
           </div>
         </div>
 
-        {/* 12. Submit & Open WhatsApp to 07740080310 */}
+        {/* 12. Submit the request and open WhatsApp */}
         <div className="pt-2">
           <button
             type="button"
@@ -1063,7 +881,7 @@ ${professorInstructions.trim() || 'لا توجد ملاحظات إضافية'}
           >
             <MessageSquare className="w-5 h-5" />
             <span>
-              {isSubmitting ? 'جاري تجهيز الطلب...' : 'إرسال الطلب عبر WhatsApp (07740080310)'}
+              {isSubmitting ? 'جاري تجهيز الطلب...' : 'إرسال الطلب عبر واتساب'}
             </span>
           </button>
 

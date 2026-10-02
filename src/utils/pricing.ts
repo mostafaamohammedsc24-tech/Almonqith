@@ -11,6 +11,7 @@ export interface PriceCalculationInput {
   specialFormatting?: boolean;
   couponCode?: string;
   useLoyaltyPoints?: number; // 100 points = 1,000 IQD
+  additionalFeeIds?: string[];
 }
 
 export interface PriceBreakdown {
@@ -21,6 +22,7 @@ export interface PriceBreakdown {
   complexityFeeIqd: number;
   formattingFeeIqd: number;
   referencesFeeIqd: number;
+  additionalFees: { id: string; label: string; amountIqd: number }[];
   urgencyFeeIqd: number;
   flexibleDiscountIqd: number; // 25% discount for deadlines > 48 hours
   subtotalIqd: number;
@@ -37,10 +39,10 @@ export interface AdminPricingConfig {
   pricePerPageGrad: number; // default 3500
   pricePerSlide: number; // default 1500
   flexibleDiscountPercent: number; // default 25% (for >48 hours or normal)
-  hours24Fee: number; // default 0 (natural baseline)
-  hours12Fee: number; // default 8000
-  hours6Fee: number; // default 15000
+  hours12UrgencyPercent: number;
+  hours6UrgencyPercent: number;
   formattingFee: number; // default 3000
+  additionalFees: { id: string; label: string; amountIqd: number }[];
 }
 
 const PRICING_CONFIG_KEY = 'al_munqith_pricing_config_v2';
@@ -60,10 +62,10 @@ export const DEFAULT_PRICING_CONFIG: AdminPricingConfig = {
   pricePerPageGrad: 3500,
   pricePerSlide: 1500,
   flexibleDiscountPercent: 25, // 25% discount for flexible/late deadlines (>48 hours)
-  hours24Fee: 0, // 24 hours is the natural baseline
-  hours12Fee: 8000,
-  hours6Fee: 15000,
+  hours12UrgencyPercent: 25,
+  hours6UrgencyPercent: 50,
   formattingFee: 3000,
+  additionalFees: [],
 };
 
 export function getAdminPricingConfig(): AdminPricingConfig {
@@ -81,6 +83,7 @@ export function getAdminPricingConfig(): AdminPricingConfig {
         ...DEFAULT_PRICING_CONFIG.serviceBasePrices,
         ...(parsed.serviceBasePrices || {}),
       },
+      additionalFees: Array.isArray(parsed.additionalFees) ? parsed.additionalFees : [],
     };
   } catch {
     return DEFAULT_PRICING_CONFIG;
@@ -113,102 +116,17 @@ export interface AdminCoupon {
   active: boolean;
   note?: string;
   usageCount?: number;
+  maxUses?: number | null;
 }
 
-const COUPONS_STORAGE_KEY = 'al_munqith_admin_coupons_v3';
-
-const DEFAULT_ADMIN_COUPONS: AdminCoupon[] = [
-  // كوبونات خصم 100% (مجاني بالكامل)
-  {
-    code: 'FREE100',
-    discountType: 'percent',
-    discountPercent: 100,
-    maxDiscountIqd: 1000000,
-    label: 'كوبون مجاني بالكامل (خصم 100%)',
-    createdAt: '2026-09-30',
-    active: true,
-    note: 'منحة الإدارة للحالات الإنسانية المعفية من الرسوم',
-    usageCount: 1,
-  },
-  {
-    code: 'MUNQITH100',
-    discountType: 'percent',
-    discountPercent: 100,
-    maxDiscountIqd: 1000000,
-    label: 'كوبون المنقذ مجاني 100%',
-    createdAt: '2026-09-30',
-    active: true,
-    note: 'اعتماد المشرف المباشر - عمل مجاني بالكامل',
-    usageCount: 0,
-  },
-  // كوبونات خصم 50% (نصف السعر)
-  {
-    code: 'SAVE50',
-    discountType: 'percent',
-    discountPercent: 50,
-    maxDiscountIqd: 500000,
-    label: 'كوبون خصم نصف السعر (50%)',
-    createdAt: '2026-09-30',
-    active: true,
-    note: 'تخفيض 50% مباشر على إجمالي تكلفة التقرير',
-    usageCount: 2,
-  },
-  {
-    code: 'MUNQITH50',
-    discountType: 'percent',
-    discountPercent: 50,
-    maxDiscountIqd: 500000,
-    label: 'كوبون المنقذ نصف السعر (50%)',
-    createdAt: '2026-09-30',
-    active: true,
-    note: 'كوبون المنقذ الجامعي المخفض للواجبات',
-    usageCount: 0,
-  },
-  {
-    code: 'VIP100',
-    discountType: 'percent',
-    discountPercent: 100,
-    maxDiscountIqd: 1000000,
-    label: 'كوبون تكريم المتفوقين (خصم 100%)',
-    createdAt: '2026-09-30',
-    active: true,
-    note: 'منحة تكريم أوائل الأقسام والكليات',
-    usageCount: 0,
-  },
-  {
-    code: 'BAGHDAD100',
-    discountType: 'percent',
-    discountPercent: 100,
-    maxDiscountIqd: 1000000,
-    label: 'منحة طلبة جامعة بغداد (خصم 100%)',
-    createdAt: '2026-09-30',
-    active: true,
-    note: 'مبادرة دعم طلبة الأقسام الداخلية',
-    usageCount: 0,
-  },
-  {
-    code: 'STUDENT50',
-    discountType: 'percent',
-    discountPercent: 50,
-    maxDiscountIqd: 500000,
-    label: 'خصم دعم الطلبة (50%)',
-    createdAt: '2026-09-30',
-    active: true,
-    note: 'مساعدة طلابية مخصصة للتقارير والبحوث',
-    usageCount: 0,
-  },
-];
+const COUPONS_STORAGE_KEY = 'al_munqith_admin_coupons_v4';
 
 export function getAdminCoupons(): AdminCoupon[] {
   try {
     const raw = localStorage.getItem(COUPONS_STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(COUPONS_STORAGE_KEY, JSON.stringify(DEFAULT_ADMIN_COUPONS));
-      return DEFAULT_ADMIN_COUPONS;
-    }
-    return JSON.parse(raw);
+    return raw ? JSON.parse(raw) : [];
   } catch {
-    return DEFAULT_ADMIN_COUPONS;
+    return [];
   }
 }
 
@@ -252,18 +170,12 @@ export function incrementCouponUsage(code: string): void {
 
 export function findCoupon(code: string): AdminCoupon | undefined {
   const coupons = getAdminCoupons();
-  return coupons.find(c => c.code.toUpperCase() === code.trim().toUpperCase() && c.active);
+  return coupons.find(c =>
+    c.code.toUpperCase() === code.trim().toUpperCase() &&
+    c.active &&
+    (c.maxUses == null || (c.usageCount || 0) < c.maxUses)
+  );
 }
-
-export const VALID_COUPONS: Record<string, { discountPercent: number; maxDiscountIqd: number; label: string }> = {
-  FREE100: { discountPercent: 100, maxDiscountIqd: 1000000, label: 'كوبون الإعفاء الكامل (100% مجاناً)' },
-  MUNQITH100: { discountPercent: 100, maxDiscountIqd: 1000000, label: 'كوبون المنقذ الأكاديمي (100% مجاناً)' },
-  SAVE50: { discountPercent: 50, maxDiscountIqd: 500000, label: 'كوبون نصف السعر (خصم 50%)' },
-  MUNQITH50: { discountPercent: 50, maxDiscountIqd: 500000, label: 'كوبون دعم الطلبة (خصم 50%)' },
-  VIP100: { discountPercent: 100, maxDiscountIqd: 1000000, label: 'منحة المتفوقين (خصم 100%)' },
-  BAGHDAD100: { discountPercent: 100, maxDiscountIqd: 1000000, label: 'منحة طلبة جامعة بغداد (100%)' },
-  STUDENT50: { discountPercent: 50, maxDiscountIqd: 500000, label: 'خصم الطلبة الاستثنائي (خصم 50%)' },
-};
 
 export function calculateOrderPrice(input: PriceCalculationInput): PriceBreakdown {
   const { service, stage, deliverySpeed, needsReferences, referenceCount = 0, specialFormatting = true, couponCode, useLoyaltyPoints = 0 } = input;
@@ -271,6 +183,10 @@ export function calculateOrderPrice(input: PriceCalculationInput): PriceBreakdow
   // Retrieve flexible admin-configured pricing
   const config = getAdminPricingConfig();
   const configuredBasePrice = config.serviceBasePrices[service.id] ?? service.basePriceIqd;
+  const selectedAdditionalFees = config.additionalFees.filter(fee =>
+    input.additionalFeeIds?.includes(fee.id) && fee.label.trim() && Number.isFinite(fee.amountIqd) && fee.amountIqd >= 0
+  );
+  const additionalFeesTotal = selectedAdditionalFees.reduce((sum, fee) => sum + fee.amountIqd, 0);
 
   let basePrice = configuredBasePrice;
   let volumePrice = 0;
@@ -321,10 +237,7 @@ export function calculateOrderPrice(input: PriceCalculationInput): PriceBreakdow
     }
   }
 
-  // Delivery Speed:
-  // - 24 hours: Natural baseline (0 IQD fee)
-  // - Less than 24 hours (12h, 6h): Urgent surcharge
-  // - More than 48 hours or relaxed dates (hours_48, normal): 25% flexible discount!
+  // Urgency percentages apply to the work price before optional formatting and references.
   let urgencyFee = 0;
   let flexibleDiscountIqd = 0;
   let isUrgentFeasible = true;
@@ -332,35 +245,35 @@ export function calculateOrderPrice(input: PriceCalculationInput): PriceBreakdow
 
   const estimatedPages = input.pageCount || 10;
   if (deliverySpeed === 'hours_6') {
-    if (estimatedPages > 15 || service.id.includes('grad_project') || service.id.includes('grad_research')) {
+    if (service.minDurationHours > 6 || estimatedPages > 15 || service.id.includes('grad_project') || service.id.includes('grad_research')) {
       isUrgentFeasible = false;
       unfeasibleReason = 'نظراً لحجم العمل ومتطلبات الجودة العالية، لا يمكن تسليم هذا المشروع خلال 6 ساعات. أقرب موعد متاح هو خلال 24-48 ساعة.';
     } else {
-      urgencyFee = config.hours6Fee;
+      urgencyFee = Math.round((basePrice + volumePrice + complexityFee) * config.hours6UrgencyPercent / 100);
     }
   } else if (deliverySpeed === 'hours_12') {
-    if (estimatedPages > 30 || service.id.includes('grad_project')) {
+    if (service.minDurationHours > 12 || estimatedPages > 30 || service.id.includes('grad_project')) {
       isUrgentFeasible = false;
       unfeasibleReason = 'هذا العمل يتطلب وقتاً أطول للتدقيق. يرجى اختيار موعد تسليم لا يقل عن 24 إلى 48 ساعة.';
     } else {
-      urgencyFee = config.hours12Fee;
+      urgencyFee = Math.round((basePrice + volumePrice + complexityFee) * config.hours12UrgencyPercent / 100);
     }
   } else if (deliverySpeed === 'hours_24') {
-    // 24 hours is the natural standard baseline (الحد الطبيعي)
-    urgencyFee = config.hours24Fee; // 0
+    urgencyFee = 0;
+    if (service.minDurationHours > 24) {
+      isUrgentFeasible = false;
+      unfeasibleReason = 'المدة الدنيا لهذه الخدمة أطول من 24 ساعة. اختر موعداً مرناً لا يقل عن 48 ساعة.';
+    }
   } else if (deliverySpeed === 'hours_48' || deliverySpeed === 'normal') {
-    // More than 48 hours or relaxed flexible deadline: 25% DISCOUNT!
     urgencyFee = 0;
     const discountRate = (config.flexibleDiscountPercent || 25) / 100;
-    flexibleDiscountIqd = Math.round(basePrice * discountRate);
-  } else {
-    urgencyFee = 0;
+    flexibleDiscountIqd = Math.round((basePrice + volumePrice + complexityFee + formattingFee + referencesFee + additionalFeesTotal) * discountRate);
   }
 
-  const subtotalBeforeDiscounts = basePrice + volumePrice + complexityFee + formattingFee + referencesFee + urgencyFee;
+  const subtotalBeforeDiscounts = basePrice + volumePrice + complexityFee + formattingFee + referencesFee + additionalFeesTotal + urgencyFee;
   const subtotalAfterFlexibleDiscount = Math.max(0, subtotalBeforeDiscounts - flexibleDiscountIqd);
 
-  // Coupon discount: search dynamic admin coupons first, then fallback
+  // Coupon discount: only admin-created coupons are recognized.
   let couponDiscountIqd = 0;
   if (couponCode) {
     const cleanCode = couponCode.trim().toUpperCase();
@@ -374,13 +287,6 @@ export function calculateOrderPrice(input: PriceCalculationInput): PriceBreakdow
         } else {
           couponDiscountIqd = Math.min(Math.round((subtotalAfterFlexibleDiscount * dynamicFound.discountPercent) / 100), dynamicFound.maxDiscountIqd);
         }
-      }
-    } else if (VALID_COUPONS[cleanCode]) {
-      const { discountPercent, maxDiscountIqd } = VALID_COUPONS[cleanCode];
-      if (discountPercent === 100) {
-        couponDiscountIqd = subtotalAfterFlexibleDiscount;
-      } else {
-        couponDiscountIqd = Math.min(Math.round((subtotalAfterFlexibleDiscount * discountPercent) / 100), maxDiscountIqd);
       }
     }
   }
@@ -407,6 +313,7 @@ export function calculateOrderPrice(input: PriceCalculationInput): PriceBreakdow
     complexityFeeIqd: complexityFee,
     formattingFeeIqd: formattingFee,
     referencesFeeIqd: referencesFee,
+    additionalFees: selectedAdditionalFees,
     urgencyFeeIqd: urgencyFee,
     flexibleDiscountIqd,
     subtotalIqd: subtotalBeforeDiscounts,

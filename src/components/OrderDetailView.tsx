@@ -20,6 +20,7 @@ import {
 import { Order, OrderMessage, RevisionRequest } from '../types';
 import { formatIqd } from '../utils/pricing';
 import { DetailedReceiptModal } from './DetailedReceiptModal';
+import { getWhatsAppUrl } from '../utils/links';
 
 interface OrderDetailViewProps {
   order: Order;
@@ -36,66 +37,16 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
   const [showRevisionModal, setShowRevisionModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showDetailedReceipt, setShowDetailedReceipt] = useState(false);
-  const [selectedPayMethod, setSelectedPayMethod] = useState<'zain_cash' | 'stripe_online'>(
-    order.paymentMethod === 'stripe_online' ? 'stripe_online' : 'zain_cash'
-  );
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [revisionType, setRevisionType] = useState<RevisionRequest['type']>('professor_notes');
   const [revisionNotes, setRevisionNotes] = useState('');
   const [rating, setRating] = useState(order.rating || 5);
   const [reviewComment, setReviewComment] = useState(order.reviewComment || '');
   const [reviewSubmitted, setReviewSubmitted] = useState(!!order.rating);
 
-  // Complete Payment Action (only when awaiting_payment)
-  const handleConfirmPayment = () => {
-    setIsProcessingPayment(true);
-    setTimeout(() => {
-      // Update timeline
-      const updatedTimeline = order.statusTimeline.map(step => {
-        if (step.status === 'awaiting_payment') {
-          return { ...step, completed: true, timestamp: 'الآن' };
-        }
-        if (step.status === 'received') {
-          return { ...step, completed: true, timestamp: 'الآن' };
-        }
-        return step;
-      });
-
-      // If awaiting_payment was not in timeline, ensure received is marked
-      const hasReceived = updatedTimeline.some(s => s.status === 'received');
-      if (!hasReceived) {
-        updatedTimeline.unshift({
-          status: 'received',
-          label: 'تم استلام وتأكيد السداد',
-          timestamp: 'الآن',
-          completed: true,
-        });
-      }
-
-      const updatedOrder: Order = {
-        ...order,
-        status: 'received',
-        paymentStatus: 'paid',
-        paymentMethod: selectedPayMethod,
-        statusTimeline: updatedTimeline,
-        messages: [
-          ...order.messages,
-          {
-            id: `msg-pay-done-${Date.now()}`,
-            sender: 'system',
-            senderName: 'نظام الدفع',
-            content: `تم تأكيد سداد المبلغ (${formatIqd(order.totalPriceIqd)}) بنجاح عبر ${
-              selectedPayMethod === 'zain_cash' ? 'محفظة زين كاش (ZainCash)' : 'منصة Stripe العالمية'
-            }. تم تحويل طلبك للكاتب الأكاديمي المختص فوراً.`,
-            timestamp: 'الآن',
-          },
-        ],
-      };
-
-      onUpdateOrder(updatedOrder);
-      setIsProcessingPayment(false);
-      setShowPaymentModal(false);
-    }, 800);
+  const handleContactPaymentSupport = () => {
+    const message = `أرغب بالاستفسار عن الدفع لطلبي ${order.orderNumber}\nالطالب: ${order.studentName || 'غير محدد'}\nالمبلغ: ${formatIqd(order.totalPriceIqd)}\nبوابة Wayl غير مفعّلة حالياً.`;
+    window.open(getWhatsAppUrl(message), '_blank', 'noopener,noreferrer');
+    setShowPaymentModal(false);
   };
 
   // Send message in order chat
@@ -112,7 +63,6 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
 
     const updatedMessages = [...order.messages, newMessage];
     
-    // Auto simulated response from team after a short moment if appropriate
     const updatedOrder = {
       ...order,
       messages: updatedMessages,
@@ -120,19 +70,6 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
     onUpdateOrder(updatedOrder);
     setChatMessage('');
 
-    setTimeout(() => {
-      const autoReply: OrderMessage = {
-        id: `msg-reply-${Date.now()}`,
-        sender: 'team',
-        senderName: order.assignedWorker?.name || 'فريق المتابعة الأكاديمية',
-        content: 'تم استلام رسالتك وجاري مراجعتها مع المتخصص المسؤول عن ملفك.',
-        timestamp: new Date().toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' }),
-      };
-      onUpdateOrder({
-        ...updatedOrder,
-        messages: [...updatedMessages, autoReply],
-      });
-    }, 1500);
   };
 
   // Submit revision request
@@ -285,7 +222,7 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
               </div>
             ) : (
               <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold block mt-0.5">
-                ✓ تم الدفع عبر {order.paymentMethod === 'stripe_online' ? 'منصة Stripe العالمية' : 'محفظة زين كاش'}
+                ✓ تم تأكيد الدفع عبر التحويل اليدوي
                 {order.verificationCode && <span className="block font-mono text-[10px] text-slate-500 dark:text-slate-400">كود التحقق: {order.verificationCode}</span>}
               </span>
             )}
@@ -761,60 +698,14 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
             </div>
 
             <div className="space-y-4 text-xs">
-              <label className="block font-bold text-slate-800">
-                اختر وسيلة الدفع لإتمام المعاملة:
-              </label>
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+                <span className="block font-bold text-slate-900">الدفع عبر Wayl غير متاح حالياً</span>
+                <span className="block text-[11px] text-slate-600">لم يتم ربط بوابة الدفع بالخادم بعد. لن تتغير حالة الطلب إلى مدفوع عبر إدخال مرجع يدوي.</span>
+              </div>
 
-              {[
-                {
-                  id: 'zain_cash',
-                  title: 'محفظة زين كاش (ZainCash)',
-                  detail: 'رقم المحفظة المعتمدة: 0780 123 4567 (المنقذ الجامعي)',
-                  badge: 'معتمد بالعراق',
-                },
-                {
-                  id: 'stripe_online',
-                  title: 'منصة Stripe العالمية (دفع إلكتروني)',
-                  detail: 'دفع بالبطاقات (Visa / Mastercard) عبر بوابة Stripe الدولية',
-                  badge: 'عالمي وآمن',
-                },
-              ].map(method => {
-                const isSelected = selectedPayMethod === method.id;
-                return (
-                  <div
-                    key={method.id}
-                    onClick={() => setSelectedPayMethod(method.id as any)}
-                    className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-between ${
-                      isSelected
-                        ? 'border-blue-700 bg-blue-50/60 shadow-xs'
-                        : 'border-slate-200 bg-white hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                        isSelected ? 'border-blue-700 bg-blue-700 text-white' : 'border-slate-300'
-                      }`}>
-                        {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900">{method.title}</span>
-                          <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded">
-                            {method.badge}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-slate-500 block mt-0.5">{method.detail}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-950 flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
-                <span>
-                  <strong>تأكيد تلقائي:</strong> يتم تحديث حالة الطلب إلى "تم استلام الطلب وتأكيد السداد" والبدء فوراً.
-                </span>
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-950 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0" />
+                <span>تواصل مع الدعم عبر واتساب للاستفسار عن الدفع. لا ترسل بيانات بطاقتك في المحادثة.</span>
               </div>
             </div>
 
@@ -828,13 +719,12 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
               </button>
               <button
                 type="button"
-                onClick={handleConfirmPayment}
-                disabled={isProcessingPayment}
+                onClick={handleContactPaymentSupport}
                 className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-black rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-2"
               >
                 <CreditCard className="w-4 h-4" />
                 <span>
-                  {isProcessingPayment ? 'جاري التحقق وتأكيد السداد...' : `تأكيد ودفع ${formatIqd(order.totalPriceIqd)}`}
+                  التواصل مع الدعم عبر واتساب
                 </span>
               </button>
             </div>

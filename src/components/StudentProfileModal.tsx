@@ -109,7 +109,8 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
       department: department.trim(),
       stage: stage || 'stage_1',
       isRegistered: true,
-      referralCode: profile.referralCode || `MNQ-${Math.floor(1000 + Math.random() * 9000)}`,
+      referralCode: profile.referralCode || `MNQ-${crypto.randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()}`,
+      referredByCode: profile.referredByCode || new URLSearchParams(window.location.search).get('ref') || undefined,
     };
 
     onSaveProfile(newProfile);
@@ -539,7 +540,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
               سرية تامة وحفظ دائم لحقوقك الأكاديمية
             </span>
             <p className="text-slate-600 dark:text-slate-400 text-[11px] leading-relaxed">
-              تسجيل حسابك يضمن حفظ نقاطك ومتابعة جميع وصولاتك المعتمدة وحقك في التعديل المجاني غير المحدود.
+              تحفظ بيانات الحساب حالياً على هذا الجهاز. لا تستخدمها كوسيلة تحقق أو حفظ سحابي.
             </p>
           </div>
         </div>
@@ -556,7 +557,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
               className="text-[11px] text-slate-400 hover:text-blue-700 dark:hover:text-blue-400 font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
             >
               <Lock className="w-3.5 h-3.5 text-slate-400" />
-              <span>بوابة المشرفين والإدارة (07740080310)</span>
+              <span>بوابة المشرفين والإدارة</span>
             </button>
           </div>
         )}

@@ -27,6 +27,7 @@ import {
   calculateLoyaltyTier 
 } from '../utils/storage';
 import { formatIqd } from '../utils/pricing';
+import { getReferralUrl } from '../utils/links';
 
 interface LoyaltyPointsModalProps {
   isOpen: boolean;
@@ -86,20 +87,22 @@ export const LoyaltyPointsModal: React.FC<LoyaltyPointsModalProps> = ({
     setTimeout(() => setCheckInCelebration(false), 3000);
   };
 
-  const referralCode = profile.referralCode || (profile.isRegistered ? `MNQ-${Math.floor(1000 + Math.random() * 9000)}` : 'MNQ-REF2026');
+  const referralCode = profile.isRegistered ? profile.referralCode || '' : '';
 
   const handleCopyReferral = () => {
-    navigator.clipboard.writeText(referralCode);
+    if (!referralCode) return;
+    navigator.clipboard.writeText(getReferralUrl(referralCode));
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 1500);
   };
 
   const handleShareReferralWhatsApp = () => {
+    if (!referralCode) return;
+    const referralUrl = getReferralUrl(referralCode);
     const text = 
 `أهلاً زميلي! 🎓
 أنصحك باستخدام منصة «المنقذ الجامعي» لإعداد التقارير والبحوث الأكاديمية والترجمة.
-استخدم كود الخصم الأكاديمي: [${referralCode}] عند طلبك وستحصل على خصم فوري 10% على تكليفك.
-رابط المنصة: https://ais-pre-j6wn3h4sunv4qf4sa2vk54-42199584482.europe-west1.run.app`;
+رابط الدعوة الخاص بي: ${referralUrl}`;
 
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
@@ -248,26 +251,27 @@ export const LoyaltyPointsModal: React.FC<LoyaltyPointsModalProps> = ({
             <div className="flex items-center gap-2">
               <Gift className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               <span className="font-black text-sm text-slate-900 dark:text-white">
-                شارك كودك واكسب 75 نقطة لكل طلب
+                رابط الإحالة
               </span>
             </div>
             <span className="text-[10px] bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 font-bold px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">
-              مكافأة زميل
+              مشاركة
             </span>
           </div>
 
           <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-            شارك كود الدعوة مع زملائك بالكلية والجامعة. عند أول طلب لهم يحصلون على خصم 10% وتحصل أنت على <strong>75 نقطة</strong> تُضاف لمحفظتك!
+            رابط الدعوة يفتح المنصة مع رمزك. مكافآت الإحالة وخصم الصديق لم تُفعّل بعد، لأنها تحتاج إلى ربط التحقق بقاعدة البيانات.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-2">
             <div className="w-full sm:flex-1 bg-slate-50 dark:bg-slate-800 px-3.5 py-2 rounded-2xl border border-slate-200 dark:border-slate-700 font-mono font-black text-xs text-blue-900 dark:text-blue-300 flex items-center justify-between">
-              <span>{referralCode}</span>
+              <span>{referralCode || 'سجّل حسابك لإنشاء رابط دعوة'}</span>
               <button
                 type="button"
                 onClick={handleCopyReferral}
+                disabled={!referralCode}
                 className="text-slate-500 hover:text-blue-700 dark:hover:text-blue-400 cursor-pointer p-1"
-                title="نسخ كود الدعوة"
+                title="نسخ رابط الدعوة"
               >
                 {copiedCode ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
               </button>
@@ -276,6 +280,7 @@ export const LoyaltyPointsModal: React.FC<LoyaltyPointsModalProps> = ({
             <button
               type="button"
               onClick={handleShareReferralWhatsApp}
+              disabled={!referralCode}
               className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-xs"
             >
               <Share2 className="w-3.5 h-3.5" />
@@ -297,11 +302,11 @@ export const LoyaltyPointsModal: React.FC<LoyaltyPointsModalProps> = ({
             </p>
             <p className="flex items-start gap-2">
               <span className="text-blue-500 font-black">•</span>
-              <span>تكسب <strong>10 نقاط</strong> عن كل 1,000 د.ع تنفقها في خدمات المنقذ الجامعي المعتمدة.</span>
+              <span>تُضاف النقاط عند إنشاء الطلب، ولا يُتحقق حالياً من السداد عبر Wayl.</span>
             </p>
             <p className="flex items-start gap-2">
               <span className="text-emerald-500 font-black">•</span>
-              <span><strong>50 نقطة مكافأة</strong> عند تقييم الخدمة وكتابة رأيك بعد استلام بحثك أو تقريرك.</span>
+              <span>يمكنك تقييم الخدمة بعد استلام الطلب؛ لا توجد مكافأة نقاط على التقييم حالياً.</span>
             </p>
             <p className="flex items-start gap-2">
               <span className="text-purple-500 font-black">•</span>

@@ -56,23 +56,8 @@ export const QuickOrderBar: React.FC<QuickOrderBarProps> = ({ onOrderParsed }) =
         onOrderParsed(data);
       }, 400);
     } catch {
-      // Fallback local logic
-      const fallbackData: ParsedOrderResult = {
-        serviceId: textToProcess.includes('عرض') || textToProcess.includes('بوربوينت') ? 'ppt_standard' : 'report_uni',
-        topic: textToProcess,
-        universityName: textToProcess.includes('النهرين') ? 'جامعة النهرين' : 'جامعة بغداد',
-        collegeName: 'كلية العلوم',
-        departmentName: 'قسم الفيزياء',
-        stage: 'stage_3',
-        pageCount: 15,
-        slideCount: 15,
-        deliverySpeed: textToProcess.includes('باچر') ? 'hours_24' : 'normal',
-        professorInstructions: textToProcess,
-        summary: 'تم تجهيز طلبك في النموذج',
-      };
       setLoading(false);
-      setStatusMessage(null);
-      onOrderParsed(fallbackData);
+      setStatusMessage('تعذر تحليل النص حالياً. أعد المحاولة أو ابدأ طلباً يدوياً.');
     }
   };
 

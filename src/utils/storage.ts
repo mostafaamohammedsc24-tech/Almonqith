@@ -1,5 +1,4 @@
 import { Order, StudentProfile, ReviewItem, PointsTransaction, AppNotification, LoyaltyTier } from '../types';
-import { INITIAL_REVIEWS } from '../data/mockOrders';
 
 const ORDERS_KEY = 'al_munqith_orders_v4';
 const PROFILE_KEY = 'al_munqith_profile_v3';
@@ -16,7 +15,13 @@ export function getStoredOrders(): Order[] {
       localStorage.setItem(ORDERS_KEY, JSON.stringify([]));
       return [];
     }
-    return JSON.parse(raw);
+    const orders: Order[] = JSON.parse(raw);
+    const cleanOrders = orders.filter(order =>
+      order.studentPhone !== '0770 123 4567' &&
+      !['ord-10298', 'ord-10294', 'ord-10291'].includes(order.id)
+    );
+    if (cleanOrders.length !== orders.length) saveOrders(cleanOrders);
+    return cleanOrders;
   } catch {
     return [];
   }
@@ -73,15 +78,14 @@ export function calculateLoyaltyTier(points: number): LoyaltyTier {
   return 'bronze';
 }
 
-export const TIER_CONFIG: Record<LoyaltyTier, { label: string; min: number; max: number; color: string; badgeBg: string; multiplier: number; perk: string }> = {
+export const TIER_CONFIG: Record<LoyaltyTier, { label: string; min: number; max: number; color: string; badgeBg: string; perk: string }> = {
   bronze: {
     label: 'طالب مجتهد (برونزي)',
     min: 0,
     max: 500,
     color: 'text-amber-700 dark:text-amber-400',
     badgeBg: 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-800',
-    multiplier: 1.0,
-    perk: 'اكسب 10 نقاط لكل 1,000 د.ع مدفوعة',
+    perk: 'شارة برونزية حسب رصيد نقاطك',
   },
   silver: {
     label: 'طالب متميز (فضي)',
@@ -89,8 +93,7 @@ export const TIER_CONFIG: Record<LoyaltyTier, { label: string; min: number; max:
     max: 1500,
     color: 'text-slate-400 dark:text-slate-300',
     badgeBg: 'bg-slate-200 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700',
-    multiplier: 1.25,
-    perk: 'مضاعفة 1.25x للنقاط + أولوية في المراجعة',
+    perk: 'شارة فضية حسب رصيد نقاطك',
   },
   gold: {
     label: 'طالب متفوق (ذهبي)',
@@ -98,8 +101,7 @@ export const TIER_CONFIG: Record<LoyaltyTier, { label: string; min: number; max:
     max: 3000,
     color: 'text-yellow-600 dark:text-yellow-400',
     badgeBg: 'bg-yellow-100 text-yellow-900 border-yellow-300 dark:bg-yellow-950 dark:text-yellow-200 dark:border-yellow-800',
-    multiplier: 1.5,
-    perk: 'مضاعفة 1.5x للنقاط + تعديل مجاني مفتوح + خصم 5% دائم',
+    perk: 'شارة ذهبية حسب رصيد نقاطك',
   },
   diamond: {
     label: 'نخبة المنقذ (ماسي)',
@@ -107,8 +109,7 @@ export const TIER_CONFIG: Record<LoyaltyTier, { label: string; min: number; max:
     max: 10000,
     color: 'text-cyan-600 dark:text-cyan-400',
     badgeBg: 'bg-cyan-100 text-cyan-950 border-cyan-300 dark:bg-cyan-950 dark:text-cyan-200 dark:border-cyan-800',
-    multiplier: 2.0,
-    perk: 'أولوية قصوى VIP + إشراف دكتوراه مباشر + خصم 10% دائم',
+    perk: 'شارة ماسية حسب رصيد نقاطك',
   },
 };
 
@@ -134,17 +135,19 @@ export function getStoredProfile(): StudentProfile {
     const raw = localStorage.getItem(PROFILE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      // Ensure zero mock/demo data before registration
-      if (!parsed.isRegistered || parsed.name === 'أحمد علي' || parsed.name === 'أحمد علي الهاشمي' || parsed.phone?.includes('0770 123')) {
-        if (!parsed.isRegistered) {
-          parsed.name = '';
-          parsed.phone = '';
-          parsed.university = '';
-          parsed.college = '';
-          parsed.department = '';
-          parsed.loyaltyPoints = 0;
-          parsed.totalEarnedPoints = 0;
-        }
+      const isDemoProfile = parsed.name === 'أحمد علي' || parsed.name === 'أحمد علي الهاشمي' || parsed.phone?.includes('0770 123');
+      if (!parsed.isRegistered || isDemoProfile) {
+        parsed.name = '';
+        parsed.phone = '';
+        parsed.university = '';
+        parsed.college = '';
+        parsed.department = '';
+        parsed.loyaltyPoints = 0;
+        parsed.totalEarnedPoints = 0;
+        parsed.dailyStreak = 0;
+        parsed.lastCheckInDate = '';
+        parsed.referralCode = '';
+        parsed.isRegistered = false;
       }
       parsed.loyaltyTier = calculateLoyaltyTier(parsed.loyaltyPoints || 0);
       return parsed;
@@ -198,29 +201,16 @@ export function addPointsTransaction(tx: Omit<PointsTransaction, 'id' | 'date'>)
   saveProfile(profile);
 }
 
-// Initial clean notification for fresh visitors
-const DEFAULT_NOTIFICATIONS: AppNotification[] = [
-  {
-    id: 'notif-welcome',
-    title: 'مرحباً بك في المنقذ الجامعي 🎓',
-    message: 'المنصة الأولى في العراق لإعداد التقارير والبحوث. سجّل حسابك مجاناً لتفعيل محفظة النقاط ومتابعة طلباتك.',
-    timestamp: 'الآن',
-    type: 'system',
-    read: false,
-    linkView: 'home',
-  },
-];
-
 export function getStoredNotifications(): AppNotification[] {
   try {
     const raw = localStorage.getItem(NOTIFICATIONS_KEY);
-    if (!raw) {
-      localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(DEFAULT_NOTIFICATIONS));
-      return DEFAULT_NOTIFICATIONS;
-    }
-    return JSON.parse(raw);
+    if (!raw) return [];
+    const notifications: AppNotification[] = JSON.parse(raw);
+    const cleanNotifications = notifications.filter(notification => notification.id !== 'notif-welcome');
+    if (cleanNotifications.length !== notifications.length) saveNotifications(cleanNotifications);
+    return cleanNotifications;
   } catch {
-    return DEFAULT_NOTIFICATIONS;
+    return [];
   }
 }
 
@@ -274,9 +264,16 @@ export function saveTheme(theme: 'light' | 'dark'): void {
 export function getStoredReviews(): ReviewItem[] {
   try {
     const raw = localStorage.getItem(REVIEWS_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const reviews: ReviewItem[] = JSON.parse(raw);
+      const cleanReviews = reviews.filter(review => !['rev-1', 'rev-2', 'rev-3', 'rev-4'].includes(review.id));
+      if (cleanReviews.length !== reviews.length) {
+        localStorage.setItem(REVIEWS_KEY, JSON.stringify(cleanReviews));
+      }
+      return cleanReviews;
+    }
   } catch {}
-  return INITIAL_REVIEWS;
+  return [];
 }
 
 export function addReview(review: ReviewItem): void {

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Sparkles, ArrowLeft, Send, Loader2, CheckCircle2, ShieldCheck, HelpCircle, MessageCircle } from 'lucide-react';
 import { formatIqd } from '../utils/pricing';
+import { getWhatsAppUrl } from '../utils/links';
 
 interface CustomRequestSectionProps {
   onStartCustomOrder: (prefillData: any) => void;
@@ -10,11 +11,13 @@ export const CustomRequestSection: React.FC<CustomRequestSectionProps> = ({ onSt
   const [details, setDetails] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const handleAnalyze = async () => {
     if (!details.trim()) return;
 
     setAnalyzing(true);
+    setAnalysisError(null);
     try {
       const res = await fetch('/api/ai/analyze-custom', {
         method: 'POST',
@@ -26,14 +29,8 @@ export const CustomRequestSection: React.FC<CustomRequestSectionProps> = ({ onSt
       const data = await res.json();
       setAnalysisResult(data);
     } catch {
-      setAnalysisResult({
-        classifiedCategory: 'مهمة أكاديمية خاصة',
-        estimatedDays: 2,
-        estimatedPriceIqd: 25000,
-        complexity: 'متوسط',
-        suggestedDeliverables: ['ملف DOCX منسق', 'نسخة PDF معتمدة'],
-        adviceForStudent: 'طلبك واضح ويمكن تنفيذه مع مشرف أكاديمي متخصص.',
-      });
+      setAnalysisResult(null);
+      setAnalysisError('تعذر تحليل الطلب حالياً. يمكنك متابعة الطلب يدوياً أو المحاولة لاحقاً.');
     } finally {
       setAnalyzing(false);
     }
@@ -48,8 +45,8 @@ export const CustomRequestSection: React.FC<CustomRequestSectionProps> = ({ onSt
   };
 
   const handleDirectWhatsApp = () => {
-    const text = encodeURIComponent(`مرحباً فريق المنقذ الجامعي، لدي طلب مخصص بالتفاصيل التالية:\n${details.trim()}`);
-    window.open(`https://wa.me/9647740080310?text=${text}`, '_blank');
+    const text = `مرحباً فريق المنقذ الجامعي، لدي طلب مخصص بالتفاصيل التالية:\n${details.trim()}`;
+    window.open(getWhatsAppUrl(text), '_blank');
   };
 
   return (
@@ -106,11 +103,12 @@ export const CustomRequestSection: React.FC<CustomRequestSectionProps> = ({ onSt
               className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <MessageCircle className="w-4 h-4" />
-              <span>إرسال التفاصيل مباشرة لواتساب 07740080310</span>
+              <span>مشاركة التفاصيل عبر واتساب</span>
             </button>
           </div>
 
           {/* Analysis Result Box */}
+          {analysisError && <p role="alert" className="text-xs text-rose-300">{analysisError}</p>}
           {analysisResult && (
             <div className="mt-3 p-3 rounded-xl bg-slate-900 border border-slate-700 text-xs space-y-2">
               <div className="flex items-center justify-between text-blue-400 font-bold">

@@ -53,8 +53,15 @@ export default function App() {
   const [pointsModalOpen, setPointsModalOpen] = useState(false);
   const [notificationsDrawerOpen, setNotificationsDrawerOpen] = useState(false);
 
-  // Admin authentication state (credentials: 07740080310 / sofydono3?)
+  // The server validates and persists admin sessions in an HttpOnly cookie.
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/admin/session', { credentials: 'same-origin' })
+      .then(response => response.json())
+      .then(data => setIsAdminLoggedIn(data.authenticated === true))
+      .catch(() => setIsAdminLoggedIn(false));
+  }, []);
 
   // Wizard pre-fill states
   const [wizardServiceId, setWizardServiceId] = useState<string | undefined>(undefined);
@@ -83,12 +90,67 @@ export default function App() {
     setNotifications(getStoredNotifications());
   }, []);
 
+  useEffect(() => {
+    if (!isAdminLoggedIn) return;
+
+    let cancelled = false;
+    setOrders([]);
+    fetch('/api/admin/orders', { credentials: 'same-origin' })
+      .then(async response => {
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(typeof result.error === 'string' ? result.error : 'تعذر تحميل الطلبات.');
+        }
+        if (!Array.isArray(result.orders)) {
+          throw new Error('استجابة الطلبات من الخادم غير صالحة.');
+        }
+        if (!cancelled) setOrders(result.orders);
+      })
+      .catch(error => {
+        console.error('Failed to load admin orders:', error);
+        if (!cancelled) {
+          setOrders([]);
+          window.alert(error instanceof Error ? error.message : 'تعذر تحميل الطلبات من قاعدة البيانات.');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdminLoggedIn]);
+
   const refreshProfileAndNotifs = () => {
     setProfile(getStoredProfile());
     setNotifications(getStoredNotifications());
   };
 
   const handleUpdateOrder = (updatedOrder: Order) => {
+    if (isAdminLoggedIn) {
+      fetch(`/api/admin/orders/${encodeURIComponent(updatedOrder.id.slice('ord-'.length))}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(updatedOrder),
+      })
+        .then(async response => {
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(typeof result.error === 'string' ? result.error : 'تعذر حفظ تحديث الطلب.');
+          }
+          if (!result.order || typeof result.order !== 'object' || result.order.id !== updatedOrder.id) {
+            throw new Error('استجابة تحديث الطلب من الخادم غير صالحة.');
+          }
+          const savedOrder = result.order as Order;
+          setOrders(current => current.map(order => order.id === savedOrder.id ? savedOrder : order));
+          if (selectedOrder?.id === savedOrder.id) setSelectedOrder(savedOrder);
+        })
+        .catch(error => {
+          console.error('Failed to save admin order update:', error);
+          window.alert(error instanceof Error ? error.message : 'تعذر حفظ تحديث الطلب.');
+        });
+      return;
+    }
+
     const updated = orders.map(o => o.id === updatedOrder.id ? updatedOrder : o);
     setOrders(updated);
     saveOrders(updated);
@@ -311,6 +373,9 @@ export default function App() {
               onUpdateOrder={handleUpdateOrder}
               onExitAdmin={() => {
                 setIsAdminLoggedIn(false);
+                setOrders(getStoredOrders());
+                setSelectedOrder(null);
+                fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => undefined);
                 setActiveView('home');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
@@ -325,7 +390,7 @@ export default function App() {
 
       </main>
 
-      {/* Floating WhatsApp support widget (visible on student views, links to 07740080310) */}
+      {/* Floating WhatsApp support widget */}
       {activeView !== 'admin' && <WhatsAppFloat />}
 
       {/* Mobile App Footer (hidden in admin mode) */}

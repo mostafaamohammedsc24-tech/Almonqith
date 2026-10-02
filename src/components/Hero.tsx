@@ -8,6 +8,7 @@ import {
   MessageCircle
 } from 'lucide-react';
 import { QuickOrderBar } from './QuickOrderBar';
+import { getWhatsAppUrl } from '../utils/links';
 
 interface HeroProps {
   onStartOrder: () => void;
@@ -54,7 +55,7 @@ export const Hero: React.FC<HeroProps> = ({
           </button>
           
           <a
-            href="https://wa.me/9647740080310"
+            href={getWhatsAppUrl()}
             target="_blank"
             rel="noopener noreferrer"
             className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"

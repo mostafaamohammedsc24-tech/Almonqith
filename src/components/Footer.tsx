@@ -1,5 +1,6 @@
 import React from 'react';
 import { GraduationCap, ShieldCheck, Heart, MessageCircle, Lock, Sparkles } from 'lucide-react';
+import { getWhatsAppUrl } from '../utils/links';
 
 interface FooterProps {
   onNavigate: (view: 'home' | 'services' | 'orders' | 'order_wizard') => void;
@@ -38,11 +39,11 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onOpenAdmin }) => {
             </div>
             <div>
               <span className="text-[10px] text-slate-400 block">دعم واستفسار مباشر:</span>
-              <span className="text-xs font-mono font-bold text-white dir-ltr block text-right">07740080310</span>
+              <span className="text-xs font-bold text-white block text-right">واتساب</span>
             </div>
           </div>
           <a
-            href="https://wa.me/9647740080310"
+            href={getWhatsAppUrl('مرحباً، أود الاستفسار عن خدمات المنقذ الجامعي.')}
             target="_blank"
             rel="noopener noreferrer"
             className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition-colors"
@@ -63,7 +64,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onOpenAdmin }) => {
           </div>
           <div className="flex items-start gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-            <span>دفع إلكتروني آمن مع تسليم العمل النهائي فور السداد.</span>
+            <span>تأكيد حالة الدفع يدوياً بعد مراجعة مرجع التحويل.</span>
           </div>
         </div>
 
@@ -91,7 +92,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onOpenAdmin }) => {
             className="text-slate-400 hover:text-blue-400 flex items-center gap-1 transition-colors cursor-pointer py-1"
           >
             <Lock className="w-3 h-3 text-slate-400" />
-            <span>دخول الإدارة (07740080310)</span>
+            <span>دخول الإدارة</span>
           </button>
         </div>
 

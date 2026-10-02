@@ -40,18 +40,18 @@ export const DetailedReceiptModal: React.FC<DetailedReceiptModalProps> = ({
   if (!isOpen) return null;
 
   const isPaid = order.paymentStatus === 'paid';
-  const payMethodName = order.paymentMethod === 'stripe_online' ? 'منصة Stripe العالمية' : 'محفظة زين كاش (ZainCash)';
+  const payMethodName = 'بوابة Wayl (غير مفعّلة بعد)';
   const stageArabic = order.stage === 'stage_1' ? 'المرحلة الأولى' : order.stage === 'stage_2' ? 'المرحلة الثانية' : order.stage === 'stage_3' ? 'المرحلة الثالثة' : order.stage === 'stage_4' ? 'المرحلة الرابعة' : 'الدراسات العليا';
 
   const receiptPlainText = `
 ══════════════════════════════════════
     منصة المنقذ الجامعي - العراق
-  وصل استلام طلب وفاتورة إلكترونية معتمدة
+  ملخص الطلب وإيصال المبلغ
 ══════════════════════════════════════
 رقم الطلب: ${order.orderNumber}
 كود التحقق الأكاديمي: ${order.verificationCode || 'VRF-MNQ'}
 تاريخ وتوقيت الطلب: ${order.createdAt}
-حالة السداد: ${isPaid ? 'مدفوع بالكامل وموثق ✓' : 'بانتظار التحويل والسداد ⏳'}
+حالة السداد: ${isPaid ? 'تم تأكيده من الإدارة ✓' : 'بانتظار تأكيد الإدارة ⏳'}
 
 بيانات الطالب:
 • الاسم: ${order.studentName || 'غير مسجل'}
@@ -65,19 +65,24 @@ export const DetailedReceiptModal: React.FC<DetailedReceiptModalProps> = ({
 • عنوان العمل: ${order.title}
 • عدد الصفحات/السلايدات: ${order.pageCount}
 • الموعد النهائي: ${order.deadlineDisplay}
-• التوثيق والمصادر: معتمد أكاديمياً (فحص سرقة علمية 100%)
+• التوثيق والمصادر: حسب متطلبات الطلب
 
 البيان المالي:
 • المبلغ الأساسي: ${formatIqd(order.basePriceIqd)}
+• الصفحات / الشرائح الإضافية: ${formatIqd(order.volumePriceIqd || 0)}
+• زيادة المرحلة الأكاديمية: ${formatIqd(order.complexityFeeIqd || 0)}
 • رسوم السرعة والتنسيق: ${formatIqd(order.urgencyFeeIqd + order.formattingFeeIqd)}
-• الخصم المالي: ${order.discountIqd > 0 ? formatIqd(order.discountIqd) : 'لا يوجد'}
+• رسوم المراجع: ${formatIqd(order.referencesFeeIqd || 0)}
+${order.additionalFees?.length ? `• الإضافات: ${order.additionalFees.map(fee => `${fee.label}: ${formatIqd(fee.amountIqd)}`).join('، ')}` : ''}
+• خصم الموعد المرن: ${formatIqd(order.flexibleDiscountIqd || 0)}
+• خصم الكوبون: ${formatIqd(Math.max(0, order.discountIqd - (order.flexibleDiscountIqd || 0)))}
+• خصم النقاط: ${formatIqd(order.pointsDiscountIqd || 0)}
 • الإجمالي النهائي: ${formatIqd(order.totalPriceIqd)}
 • طريقة الدفع: ${payMethodName}
 • مرجع العملية: ${order.paymentReference || 'سداد مباشر'}
 
-الضمان الأكاديمي:
-• ضمان الأصالة وخلو من الاستلال العلمي بنسبة 100%
-• تعديلات مجانية لمدة 7 أيام من الاستلام
+ملاحظات:
+• تتم مراجعة حالة الدفع يدوياً من الإدارة
 ══════════════════════════════════════
 `;
 
@@ -107,10 +112,10 @@ export const DetailedReceiptModal: React.FC<DetailedReceiptModalProps> = ({
           </div>
           <div>
             <h2 className="text-sm font-black text-slate-900 dark:text-white leading-none">
-              وصل الطلب الأكاديمي المعتمد
+              تفاصيل الطلب والإيصال
             </h2>
             <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 leading-none">
-              فاتورة رسمية موثقة برقم وتفاصيل العمل
+              ملخص بيانات العمل والسعر المسجل
             </p>
           </div>
         </div>
@@ -175,14 +180,14 @@ export const DetailedReceiptModal: React.FC<DetailedReceiptModalProps> = ({
                   المنصة الأكاديمية الأولى لإعداد التقارير والبحوث الجامعية
                 </p>
                 <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                  بغداد - العراق · دعم مباشر 07740080310
+                  العراق · المنقذ الجامعي
                 </p>
               </div>
             </div>
 
             <div className="bg-slate-50 dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-left sm:text-right shrink-0">
               <div className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">
-                وصل استلام رسمي رقم
+                رقم الطلب
               </div>
               <div className="text-base font-black text-blue-800 dark:text-blue-400 font-mono tracking-tight">
                 {order.orderNumber}
@@ -214,7 +219,7 @@ export const DetailedReceiptModal: React.FC<DetailedReceiptModalProps> = ({
               )}
               <div>
                 <span className="text-xs font-black block">
-                  {isPaid ? 'حالة السداد: مدفوع بالكامل ومؤكد رسمياً ✓' : 'حالة السداد: بانتظار إتمام الدفع لبدء العمل ⏳'}
+                  {isPaid ? 'حالة السداد: أكدته الإدارة ✓' : 'حالة السداد: بانتظار تأكيد الإدارة ⏳'}
                 </span>
                 <span className="text-[11px] opacity-80 block">
                   طريقة الدفع: {payMethodName} · {order.paymentReference || 'سداد إلكتروني'}
@@ -295,7 +300,7 @@ export const DetailedReceiptModal: React.FC<DetailedReceiptModalProps> = ({
               </div>
               <div className="flex justify-between py-0.5">
                 <span className="text-slate-500 dark:text-slate-400">التوثيق والمراجع:</span>
-                <span className="font-bold text-emerald-700 dark:text-emerald-400">معتمد وشامل المصادر</span>
+                <span className="font-bold text-emerald-700 dark:text-emerald-400">حسب متطلبات الطلب</span>
               </div>
             </div>
 
@@ -312,6 +317,15 @@ export const DetailedReceiptModal: React.FC<DetailedReceiptModalProps> = ({
                 <span>سعر الخدمة الأساسية ({order.serviceName}):</span>
                 <span className="font-mono">{formatIqd(order.basePriceIqd)}</span>
               </div>
+              {(order.volumePriceIqd || 0) > 0 && (
+                <div className="flex justify-between text-slate-600 dark:text-slate-300"><span>الصفحات / الشرائح الإضافية:</span><span className="font-mono">+{formatIqd(order.volumePriceIqd || 0)}</span></div>
+              )}
+              {(order.complexityFeeIqd || 0) > 0 && (
+                <div className="flex justify-between text-slate-600 dark:text-slate-300"><span>زيادة المرحلة الأكاديمية:</span><span className="font-mono">+{formatIqd(order.complexityFeeIqd || 0)}</span></div>
+              )}
+              {(order.referencesFeeIqd || 0) > 0 && (
+                <div className="flex justify-between text-slate-600 dark:text-slate-300"><span>المراجع:</span><span className="font-mono">+{formatIqd(order.referencesFeeIqd || 0)}</span></div>
+              )}
               {order.formattingFeeIqd > 0 && (
                 <div className="flex justify-between text-slate-600 dark:text-slate-300">
                   <span>رسوم التنسيق الأكاديمي والصفحات الإضافية:</span>
@@ -324,12 +338,22 @@ export const DetailedReceiptModal: React.FC<DetailedReceiptModalProps> = ({
                   <span className="font-mono">+{formatIqd(order.urgencyFeeIqd)}</span>
                 </div>
               )}
-              {order.discountIqd > 0 && (
+              {order.additionalFees?.map(fee => (
+                <div key={fee.id} className="flex justify-between text-slate-600 dark:text-slate-300">
+                  <span>{fee.label}:</span>
+                  <span className="font-mono">+{formatIqd(fee.amountIqd)}</span>
+                </div>
+              ))}
+              {(order.flexibleDiscountIqd || 0) > 0 && (
+                <div className="flex justify-between text-emerald-700 dark:text-emerald-400 font-bold"><span>خصم الموعد المرن:</span><span className="font-mono">-{formatIqd(order.flexibleDiscountIqd || 0)}</span></div>
+              )}
+              {order.discountIqd - (order.flexibleDiscountIqd || 0) > 0 && (
                 <div className="flex justify-between text-emerald-700 dark:text-emerald-400 font-bold">
-                  <span>خصم كوبون أو نقاط مكافأة ({order.couponCode || 'خصم ترويجي'}):</span>
-                  <span className="font-mono">-{formatIqd(order.discountIqd)}</span>
+                  <span>خصم الكوبون ({order.couponCode || 'غير محدد'}):</span>
+                  <span className="font-mono">-{formatIqd(order.discountIqd - (order.flexibleDiscountIqd || 0))}</span>
                 </div>
               )}
+              {(order.pointsDiscountIqd || 0) > 0 && <div className="flex justify-between text-emerald-700 dark:text-emerald-400 font-bold"><span>خصم النقاط:</span><span className="font-mono">-{formatIqd(order.pointsDiscountIqd || 0)}</span></div>}
               <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center text-sm font-black text-slate-900 dark:text-white">
                 <span>المبلغ الإجمالي المستحق:</span>
                 <span className="text-base text-blue-800 dark:text-blue-400 font-mono">
@@ -344,10 +368,10 @@ export const DetailedReceiptModal: React.FC<DetailedReceiptModalProps> = ({
             <ShieldCheck className="w-6 h-6 text-blue-700 dark:text-blue-400 shrink-0 mt-0.5" />
             <div className="space-y-1">
               <span className="font-black text-blue-950 dark:text-blue-200 block">
-                ضمان الجودة الأكاديمية والسرقة العلمية 100%
+                ملاحظات تنفيذ الطلب
               </span>
               <p className="text-blue-900/80 dark:text-blue-300/80 text-[11px] leading-relaxed">
-                هذا الوصل وثيقة إلكترونية رسمية صادرة عن نظام «المنقذ الجامعي». يتعهد الفريق بتسليم العمل وفق معايير الكلية بدقة، مع فحص الاستلال عبر Turnitin، وتوفير حق التعديل المجاني غير المحدود خلال أسبوع من التسليم.
+                هذا ملخص إلكتروني لبيانات الطلب والمبلغ المسجل. لا يُعد إثباتاً رسمياً للدفع ما لم تؤكد الإدارة استلامه.
               </p>
             </div>
           </div>

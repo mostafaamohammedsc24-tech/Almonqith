@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   LayoutDashboard, 
   ShoppingBag, 
@@ -34,17 +34,23 @@ import {
   Share2
 } from 'lucide-react';
 import { Order, OrderStatus, Worker, WorkerRole } from '../types';
-import { WORKERS_TEAM } from '../data/mockOrders';
 import { ALL_SERVICES } from '../data/services';
 import { IRAQI_UNIVERSITIES } from '../data/universities';
+import { getWhatsAppUrl } from '../utils/links';
 import { 
   formatIqd, 
   getAdminCoupons, 
   addAdminCoupon, 
   deleteAdminCoupon, 
   toggleAdminCouponActive, 
-  AdminCoupon 
+  AdminCoupon,
+  AdminPricingConfig,
+  getAdminPricingConfig,
+  saveAdminPricingConfig
 } from '../utils/pricing';
+
+type EditablePricingKey = Exclude<keyof AdminPricingConfig, 'serviceBasePrices'>;
+const COORDINATORS_STORAGE_KEY = 'al_munqith_coordinators_v1';
 
 interface AdminDashboardProps {
   orders: Order[];
@@ -63,7 +69,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'pending'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [workersList, setWorkersList] = useState<Worker[]>(WORKERS_TEAM);
+  const [workersList, setWorkersList] = useState<Worker[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(COORDINATORS_STORAGE_KEY) || '[]');
+    } catch {
+      return [];
+    }
+  });
   const [selectedOrderForAssign, setSelectedOrderForAssign] = useState<Order | null>(null);
 
   // Copied states for feedback
@@ -72,13 +84,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Dynamic Coupons State (managed strictly by admin)
   const [adminCoupons, setAdminCoupons] = useState<AdminCoupon[]>(getAdminCoupons());
+  const [pricingConfig, setPricingConfig] = useState<AdminPricingConfig>(getAdminPricingConfig());
+  const [newWorkerName, setNewWorkerName] = useState('');
+  const [newWorkerSpecialty, setNewWorkerSpecialty] = useState('');
+  const [newWorkerRole, setNewWorkerRole] = useState<WorkerRole>('Academic Writer');
+  const [newFeeLabel, setNewFeeLabel] = useState('');
+  const [newFeeAmount, setNewFeeAmount] = useState(0);
   const [newCouponCode, setNewCouponCode] = useState('');
   const [newCouponType, setNewCouponType] = useState<'percent' | 'fixed'>('percent');
   const [newCouponPercent, setNewCouponPercent] = useState<number>(100);
   const [newCouponAmount, setNewCouponAmount] = useState<number>(10000);
   const [newCouponMaxDiscount, setNewCouponMaxDiscount] = useState<number>(1000000);
+  const [newCouponMaxUses, setNewCouponMaxUses] = useState<number | null>(1);
   const [newCouponNote, setNewCouponNote] = useState('');
   const [couponSuccessMsg, setCouponSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem(COORDINATORS_STORAGE_KEY, JSON.stringify(workersList));
+  }, [workersList]);
 
   // Handle Create Coupon by Admin
   const handleCreateCoupon = (e: React.FormEvent) => {
@@ -104,6 +127,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       active: true,
       note: newCouponNote.trim() || (newCouponPercent === 100 ? 'منحة مجانية 100% صادرة من الإدارة' : `كوبون تخفيض ${newCouponPercent}%`),
       usageCount: 0,
+      maxUses: newCouponMaxUses,
     };
 
     addAdminCoupon(newCoupon);
@@ -139,12 +163,65 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleGenerateRandomCode = (percent: number) => {
-    const randomNum = Math.floor(100 + Math.random() * 900);
+    const randomNum = 100 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900);
     const prefix = percent === 100 ? 'FREE' : percent === 50 ? 'SAVE' : 'MNQ';
     setNewCouponCode(`${prefix}${randomNum}`);
     setNewCouponType('percent');
     setNewCouponPercent(percent);
     setNewCouponMaxDiscount(percent === 100 ? 1000000 : 500000);
+  };
+
+  const updatePricingValue = (key: EditablePricingKey, value: number) => {
+    const next = { ...pricingConfig, [key]: Math.max(0, value) };
+    setPricingConfig(next);
+    saveAdminPricingConfig(next);
+  };
+
+  const updateServicePrice = (serviceId: string, value: number) => {
+    const next = {
+      ...pricingConfig,
+      serviceBasePrices: { ...pricingConfig.serviceBasePrices, [serviceId]: Math.max(0, value) },
+    };
+    setPricingConfig(next);
+    saveAdminPricingConfig(next);
+  };
+
+  const handleAddAdditionalFee = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!newFeeLabel.trim() || newFeeAmount < 0) return;
+    const next = {
+      ...pricingConfig,
+      additionalFees: [...pricingConfig.additionalFees, {
+        id: crypto.randomUUID(),
+        label: newFeeLabel.trim(),
+        amountIqd: Math.round(newFeeAmount),
+      }],
+    };
+    setPricingConfig(next);
+    saveAdminPricingConfig(next);
+    setNewFeeLabel('');
+    setNewFeeAmount(0);
+  };
+
+  const handleDeleteAdditionalFee = (id: string) => {
+    const next = { ...pricingConfig, additionalFees: pricingConfig.additionalFees.filter(fee => fee.id !== id) };
+    setPricingConfig(next);
+    saveAdminPricingConfig(next);
+  };
+
+  const handleAddWorker = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!newWorkerName.trim() || !newWorkerSpecialty.trim()) return;
+    setWorkersList(current => [...current, {
+      id: `worker-${crypto.randomUUID()}`,
+      name: newWorkerName.trim(),
+      role: newWorkerRole,
+      specialty: newWorkerSpecialty.trim(),
+      activeOrdersCount: 0,
+      rating: 0,
+    }]);
+    setNewWorkerName('');
+    setNewWorkerSpecialty('');
   };
 
   // Share Coupon with Student via WhatsApp
@@ -168,40 +245,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
 بالتوفيق في مسيرتك الجامعية!`;
 
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-  };
-
-  // Toggle Payment Status on Order
-  const handleTogglePaymentStatus = (order: Order) => {
-    const isNowPaid = order.paymentStatus !== 'paid';
-    const updatedTimeline = order.statusTimeline.map(step => {
-      if (step.status === 'awaiting_payment' || step.status === 'received') {
-        return { ...step, completed: isNowPaid, timestamp: 'الآن' };
-      }
-      return step;
-    });
-
-    const updatedOrder: Order = {
-      ...order,
-      paymentStatus: isNowPaid ? 'paid' : 'pending',
-      paidAt: isNowPaid ? new Date().toISOString().replace('T', ' ').slice(0, 16) : undefined,
-      status: isNowPaid && order.status === 'awaiting_payment' ? 'received' : order.status,
-      statusTimeline: updatedTimeline,
-      messages: [
-        ...order.messages,
-        {
-          id: `msg-pay-admin-${Date.now()}`,
-          sender: 'system',
-          senderName: 'المشرف العام',
-          content: isNowPaid 
-            ? `قام المشرف بتأكيد استلام السداد بنجاح (${order.paymentMethod === 'stripe_online' ? 'منصة Stripe' : 'زين كاش'}). الطلب قيد التجهيز.`
-            : 'تم تغيير حالة السداد إلى: بانتظار الدفع.',
-          timestamp: 'الآن',
-        },
-      ],
-    };
-
-    onUpdateOrder(updatedOrder);
+    window.open(getWhatsAppUrl(text), '_blank');
   };
 
   // Open Direct WhatsApp with Student about this exact Order
@@ -217,7 +261,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 كود التحقق: ${order.verificationCode || '---'}
 حالة الدفع المسجلة: ${order.paymentStatus === 'paid' ? 'مدفوع بالكامل ✅' : 'بانتظار تأكيد الدفع ⏳'}`;
 
-    window.open(`https://wa.me/${fullPhone || '9647740080310'}?text=${encodeURIComponent(msg)}`, '_blank');
+    window.open(getWhatsAppUrl(msg, fullPhone), '_blank');
   };
 
   // Statistics calculation
@@ -330,11 +374,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   لوحة تحكم المنقذ الجامعي
                 </h1>
                 <span className="text-[10px] bg-emerald-950 text-emerald-300 font-bold px-2 py-0.5 rounded border border-emerald-700">
-                  المشرف الأكاديمي (07740080310)
+                  لوحة الإدارة
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                إدارة الطلبات، تدقيق عمليات الدفع الإلكتروني (زين كاش & Stripe)، وإنتاج الكوبونات
+                إدارة الطلبات ومراجعة التحويلات وإعداد الأسعار والكوبونات
               </p>
             </div>
           </div>
@@ -381,7 +425,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700/80">
             <span className="text-[11px] text-slate-400 block mb-1">إجمالي المقبوضات:</span>
             <span className="text-lg font-black text-emerald-400">{formatIqd(totalRevenue)}</span>
-            <span className="text-[10px] text-slate-400 block mt-1">زين كاش & Stripe</span>
+            <span className="text-[10px] text-slate-400 block mt-1">مبالغ الطلبات المؤكدة فقط</span>
           </div>
 
           <div className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700/80">
@@ -509,7 +553,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     {filteredOrders.length > 0 ? (
                       filteredOrders.map(order => {
                         const isPaid = order.paymentStatus === 'paid';
-                        const isZain = order.paymentMethod === 'zain_cash';
                         const isCopied = copiedOrderNumber === order.orderNumber;
 
                         return (
@@ -562,7 +605,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               )}
                             </td>
 
-                            {/* Payment Status (Linked directly with ZainCash & Stripe) */}
+                            {/* Payment status, manually verified by admin */}
                             <td className="py-3.5 px-4 whitespace-nowrap">
                               <div className="space-y-1">
                                 <div className="flex items-center gap-1.5">
@@ -586,7 +629,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 <div className="text-[10px] text-slate-400 flex items-center gap-1">
                                   <span>الوسيلة:</span>
                                   <span className="font-bold text-slate-200">
-                                    {isZain ? 'محفظة زين كاش' : 'منصة Stripe'}
+                                    بوابة Wayl (غير مفعّلة)
                                   </span>
                                 </div>
 
@@ -596,18 +639,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   </div>
                                 )}
 
-                                {/* Admin Instant Toggle Payment */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleTogglePaymentStatus(order)}
-                                  className={`mt-1 px-2 py-0.5 text-[10px] font-bold rounded border cursor-pointer transition-colors ${
-                                    isPaid 
-                                      ? 'text-rose-400 border-rose-800 hover:bg-rose-950/50' 
-                                      : 'text-emerald-400 border-emerald-700 bg-emerald-950/60 hover:bg-emerald-900'
-                                  }`}
-                                >
-                                  {isPaid ? 'إلغاء تأكيد السداد 🔄' : 'تأكيد استلام الدفع الآن ✅'}
-                                </button>
                               </div>
                             </td>
 
@@ -735,7 +766,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       required
                       value={newCouponCode}
                       onChange={(e) => setNewCouponCode(e.target.value.toUpperCase())}
-                      placeholder="مثال: FREE100, SAVE50, BAGHDAD_VIP"
+                      placeholder="أدخل رمزاً من اختيارك"
                       className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-600 text-white font-mono font-bold text-xs uppercase focus:outline-none focus:border-blue-500"
                     />
                     <button
@@ -844,6 +875,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   />
                 </div>
 
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">عدد مرات الاستخدام الكلي:</label>
+                  <select
+                    value={newCouponMaxUses ?? 'unlimited'}
+                    onChange={(e) => setNewCouponMaxUses(e.target.value === 'unlimited' ? null : Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-600 text-white text-xs"
+                  >
+                    <option value={1}>مرة واحدة</option>
+                    <option value={10}>10 مرات</option>
+                    <option value={50}>50 مرة</option>
+                    <option value="unlimited">غير محدود</option>
+                  </select>
+                </div>
+
                 {/* Submit button */}
                 <button
                   type="submit"
@@ -920,7 +965,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                       <div className="pt-2 border-t border-slate-700/80 space-y-2">
                         <div className="flex items-center justify-between text-[10px] text-slate-400">
-                          <span>مرات الاستخدام: <strong className="text-slate-200">{c.usageCount || 0}</strong></span>
+                          <span>الاستخدام: <strong className="text-slate-200">{c.usageCount || 0} / {c.maxUses ?? '∞'}</strong></span>
                           <span>بتاريخ: {c.createdAt}</span>
                         </div>
 
@@ -976,8 +1021,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-bold text-white">الكادر الأكاديمي والمدققين</h2>
-              <span className="text-xs text-slate-400">توزيع حسب التخصص (طب، هندسة، علوم، لغات، إحصاء)</span>
+              <span className="text-xs text-slate-400">{workersList.length} منسقاً أكاديمياً</span>
             </div>
+
+            <form onSubmit={handleAddWorker} className="grid grid-cols-1 md:grid-cols-4 gap-2 bg-slate-800/90 p-4 rounded-xl border border-slate-700">
+              <input value={newWorkerName} onChange={event => setNewWorkerName(event.target.value)} required placeholder="اسم المنسق" className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs" />
+              <input value={newWorkerSpecialty} onChange={event => setNewWorkerSpecialty(event.target.value)} required placeholder="التخصص الأكاديمي" className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs" />
+              <select value={newWorkerRole} onChange={event => setNewWorkerRole(event.target.value as WorkerRole)} className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs">
+                {['Academic Writer', 'Subject Specialist', 'Presentation Designer', 'Reviewer', 'Quality Control', 'Customer Support'].map(role => <option key={role} value={role}>{role}</option>)}
+              </select>
+              <button type="submit" className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center justify-center gap-1"><Plus className="w-4 h-4" />إضافة منسق</button>
+            </form>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {workersList.map(worker => (
@@ -987,10 +1041,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <span className="text-xs font-bold text-blue-400 bg-blue-950 px-2 py-0.5 rounded border border-blue-800">
                         {worker.role}
                       </span>
-                      <div className="flex items-center gap-1 text-amber-400 text-xs font-bold">
-                        <Star className="w-3.5 h-3.5 fill-amber-400" />
-                        <span>{worker.rating}</span>
-                      </div>
+                      <button type="button" onClick={() => setWorkersList(current => current.filter(item => item.id !== worker.id))} className="p-1 text-rose-400 hover:bg-rose-950 rounded" aria-label={`حذف ${worker.name}`}><Trash2 className="w-4 h-4" /></button>
                     </div>
 
                     <h3 className="font-bold text-white text-sm mb-1">{worker.name}</h3>
@@ -1003,6 +1054,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                 </div>
               ))}
+              {workersList.length === 0 && <p className="text-sm text-slate-400">لا يوجد منسقون مسجلون.</p>}
             </div>
           </div>
         )}
@@ -1015,12 +1067,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span className="text-xs text-slate-400">الأسعار بالدينار العراقي (د.ع)</span>
             </div>
 
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-800/90 p-4 rounded-xl border border-slate-700">
+              {[
+                { key: 'flexibleDiscountPercent', label: 'خصم الموعد المرن %' },
+                { key: 'hours12UrgencyPercent', label: 'زيادة 12 ساعة %' },
+                { key: 'hours6UrgencyPercent', label: 'زيادة 6 ساعات %' },
+                { key: 'formattingFee', label: 'أجور التنسيق د.ع' },
+                { key: 'pricePerPageRegular', label: 'سعر الصفحة د.ع' },
+                { key: 'pricePerPageGrad', label: 'صفحة التخرج د.ع' },
+                { key: 'pricePerSlide', label: 'سعر الشريحة د.ع' },
+              ].map(field => (
+                <label key={field.key} className="text-[11px] text-slate-300 space-y-1">
+                  <span>{field.label}</span>
+                  <input type="number" min="0" value={pricingConfig[field.key as EditablePricingKey] as number} onChange={event => updatePricingValue(field.key as EditablePricingKey, Number(event.target.value))} className="w-full px-2.5 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white" />
+                </label>
+              ))}
+            </div>
+
+            <div className="bg-slate-800/90 p-4 rounded-xl border border-slate-700 space-y-3">
+              <h3 className="text-sm font-bold text-white">إضافات اختيارية تظهر في الطلب والوصل</h3>
+              <form onSubmit={handleAddAdditionalFee} className="grid grid-cols-1 sm:grid-cols-[1fr_180px_auto] gap-2">
+                <input value={newFeeLabel} onChange={event => setNewFeeLabel(event.target.value)} required placeholder="اسم الإضافة" className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs" />
+                <input type="number" min="0" step="250" value={newFeeAmount} onChange={event => setNewFeeAmount(Number(event.target.value))} required aria-label="قيمة الإضافة بالدينار" className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs" />
+                <button type="submit" className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center justify-center gap-1"><Plus className="w-4 h-4" />إضافة</button>
+              </form>
+              {pricingConfig.additionalFees.map(fee => (
+                <div key={fee.id} className="flex items-center justify-between border-t border-slate-700 pt-2 text-xs">
+                  <span className="text-slate-200">{fee.label} · {formatIqd(fee.amountIqd)}</span>
+                  <button type="button" onClick={() => handleDeleteAdditionalFee(fee.id)} className="p-1 text-rose-400 hover:bg-rose-950 rounded" aria-label={`حذف ${fee.label}`}><Trash2 className="w-4 h-4" /></button>
+                </div>
+              ))}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {ALL_SERVICES.map(service => (
                 <div key={service.id} className="bg-slate-800 p-4 rounded-2xl border border-slate-700 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-white text-sm">{service.name}</span>
-                    <span className="text-xs font-black text-amber-400">{formatIqd(service.basePriceIqd)}</span>
+                    <label className="flex items-center gap-1 text-xs font-black text-amber-400">
+                      <input type="number" min="0" value={pricingConfig.serviceBasePrices[service.id] ?? service.basePriceIqd} onChange={event => updateServicePrice(service.id, Number(event.target.value))} className="w-28 px-2 py-1 rounded bg-slate-900 border border-slate-700 text-white" aria-label={`سعر ${service.name}`} />
+                      <span>د.ع</span>
+                    </label>
                   </div>
                   <p className="text-xs text-slate-400">{service.description}</p>
                   <div className="pt-2 border-t border-slate-700 flex items-center justify-between text-[11px] text-slate-400">

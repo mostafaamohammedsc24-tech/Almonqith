@@ -15,12 +15,20 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const database = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL }) : null;
+const isProduction = process.env.NODE_ENV === 'production';
 
 app.use(express.json({ limit: '64kb' }));
-app.set('trust proxy', 'loopback');
+app.set('trust proxy', isProduction ? 1 : 'loopback');
 
 const ADMIN_SESSION_COOKIE = 'al_munqith_admin_session';
 const ADMIN_SESSION_SECONDS = 8 * 60 * 60;
+const adminLoginLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'تم تجاوز عدد محاولات الدخول. يرجى المحاولة بعد 15 دقيقة.' },
+});
 const orderSubmissionLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 10,
@@ -103,7 +111,7 @@ const ORDER_STATUSES = [
   'revision',
 ];
 
-app.post('/api/admin/login', (req, res) => {
+app.post('/api/admin/login', adminLoginLimit, (req, res) => {
   const configuredPhone = process.env.ADMIN_PHONE;
   const configuredPassword = process.env.ADMIN_PASSWORD;
   if (!configuredPhone || !configuredPassword || !process.env.SESSION_SECRET) {
@@ -162,7 +170,7 @@ app.post('/api/orders', orderSubmissionLimit, async (req, res) => {
   const persistedOrder = {
     ...order,
     paymentStatus: 'pending',
-    paymentReference: 'بانتظار تفعيل بوابة Wayl',
+    paymentReference: 'بانتظار تأكيد الدفع',
     paidAt: undefined,
     status: 'awaiting_payment',
   };
@@ -270,9 +278,18 @@ app.put('/api/admin/orders/:id', async (req, res) => {
     const details = isRecord(current.details) ? current.details : {};
     const updatedOrder = {
       ...details,
-      ...req.body,
+      ...(Array.isArray(req.body.messages) ? { messages: req.body.messages } : {}),
+      ...(Array.isArray(req.body.statusTimeline) ? { statusTimeline: req.body.statusTimeline } : {}),
+      ...(isRecord(req.body.assignedWorker) || req.body.assignedWorker === null
+        ? { assignedWorker: req.body.assignedWorker }
+        : {}),
+      ...(Array.isArray(req.body.revisions) ? { revisions: req.body.revisions } : {}),
+      ...(typeof req.body.rating === 'number' ? { rating: req.body.rating } : {}),
+      ...(typeof req.body.reviewComment === 'string' ? { reviewComment: req.body.reviewComment } : {}),
+      ...(typeof req.body.deliveredAt === 'string' ? { deliveredAt: req.body.deliveredAt } : {}),
       id: `ord-${req.params.id}`,
       orderNumber: current.order_number,
+      status: req.body.status,
       paymentMethod: 'wayl_online',
       paymentStatus: current.payment_status,
       totalPriceIqd: Number(current.total_iqd),
@@ -553,7 +570,7 @@ app.post('/api/ai/analyze-custom', async (req, res) => {
 
 // Setup Vite middleware in dev or static files in production
 async function startServer() {
-  const isDev = process.env.NODE_ENV !== 'production';
+  const isDev = !isProduction;
   if (!isDev && !database) {
     throw new Error('DATABASE_URL is required in production; refusing to start without persistent order storage.');
   }
@@ -573,8 +590,9 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, isDev ? '0.0.0.0' : '127.0.0.1', () => {
-    console.log(`[المنقذ الجامعي] Server running on http://localhost:${PORT}`);
+  const host = process.env.HOST || '0.0.0.0';
+  app.listen(PORT, host, () => {
+    console.log(`[المنقذ الجامعي] Server running on http://${host}:${PORT}`);
   });
 }
 

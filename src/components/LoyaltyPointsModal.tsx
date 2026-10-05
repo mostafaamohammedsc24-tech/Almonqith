@@ -302,7 +302,7 @@ export const LoyaltyPointsModal: React.FC<LoyaltyPointsModalProps> = ({
             </p>
             <p className="flex items-start gap-2">
               <span className="text-blue-500 font-black">•</span>
-              <span>تُضاف النقاط عند إنشاء الطلب، ولا يُتحقق حالياً من السداد عبر Wayl.</span>
+              <span>تُضاف النقاط عند تسجيل الطلب وفق رصيد حسابك.</span>
             </p>
             <p className="flex items-start gap-2">
               <span className="text-emerald-500 font-black">•</span>

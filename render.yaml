@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: almonqith
+    runtime: node
+    plan: starter
+    region: frankfurt
+    buildCommand: npm ci && npm run build
+    preDeployCommand: npm run db:migrate
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_PHONE
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: almonqith-db
+          property: connectionString
+
+databases:
+  - name: almonqith-db
+    databaseName: almonqith
+    user: almonqith
+    plan: basic-256mb
+    region: frankfurt
+    postgresMajorVersion: "16"

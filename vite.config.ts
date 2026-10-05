@@ -5,7 +5,10 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
-  const basePath = process.env.GITHUB_ACTIONS === 'true' ? '/Almonqith/' : '/';
+  const isRepositoryPages = process.env.GITHUB_ACTIONS === 'true' &&
+    !process.env.VITE_APP_BASE_URL;
+  const basePath = process.env.VITE_APP_BASE_URL ||
+    (isRepositoryPages ? '/Almonqith/' : '/');
 
   return {
     base: basePath,

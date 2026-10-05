@@ -94,7 +94,6 @@ export const OrderWizard: React.FC<OrderWizardProps> = ({
   // 10.5 نقاط المكافأة والولاء
   const [usePointsDiscount, setUsePointsDiscount] = useState<boolean>(false);
 
-  // Keep orders pending until Wayl's server-side integration is configured.
   const paymentMethod: Order['paymentMethod'] = 'wayl_online';
 
   // Error validation state
@@ -212,10 +211,10 @@ export const OrderWizard: React.FC<OrderWizardProps> = ({
     else if (deliverySpeed === 'normal') deadlineDisplay = 'موعد مرن 3 - 5 أيام (خصم 25%)';
 
     const isPaid = false;
-    const paymentReference = 'بانتظار تفعيل بوابة Wayl';
+    const paymentReference = 'بانتظار تأكيد الدفع';
 
     const stageArabic = stage === 'stage_1' ? 'الأولى' : stage === 'stage_2' ? 'الثانية' : stage === 'stage_3' ? 'الثالثة' : stage === 'stage_4' ? 'الرابعة' : 'الدراسات العليا';
-    const payMethodTitle = 'بوابة Wayl (غير مفعّلة بعد)';
+    const payMethodTitle = 'الدفع الإلكتروني';
     const deliveryHours: Record<string, number> = {
       hours_6: 6,
       hours_12: 12,
@@ -814,19 +813,9 @@ ${professorInstructions.trim() || 'لا توجد ملاحظات إضافية'}
             </span>
           </div>
           <p className="text-xs text-amber-800">
-            بوابة Wayl غير مفعّلة بعد. لن يُحصّل أي مبلغ ولن يُعد الطلب مدفوعاً قبل ربط الخادم والتحقق من إشعار الدفع.
+            ستُعرض خيارات الدفع الإلكتروني عند تفعيلها. لا ترسل بيانات بطاقتك عبر واتساب.
           </p>
 
-          {/* Mandatory Deliver Notice */}
-          <div className="p-3 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-950 text-xs">
-            <span className="font-black flex items-center gap-1.5 text-amber-950 mb-0.5">
-              <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
-              <span>ملاحظة هامة جداً:</span>
-            </span>
-            <p className="font-extrabold text-[11px] text-amber-950 leading-relaxed">
-              ⚠️ يتم تسليم التقرير والعمل النهائي بعد إتمام عملية الدفع.
-            </p>
-          </div>
         </div>
 
         {/* Pricing Summary Box */}
@@ -876,19 +865,17 @@ ${professorInstructions.trim() || 'لا توجد ملاحظات إضافية'}
           <button
             type="button"
             onClick={handleSubmitAndSendToWhatsApp}
-            disabled={isSubmitting || import.meta.env.VITE_STATIC_PREVIEW === 'true'}
+            disabled={isSubmitting}
             className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-400 disabled:shadow-none text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed active:scale-98"
           >
             <MessageSquare className="w-5 h-5" />
             <span>
-              {isSubmitting ? 'جاري تجهيز الطلب...' : import.meta.env.VITE_STATIC_PREVIEW === 'true' ? 'إرسال الطلب غير متاح في نسخة العرض' : 'إرسال الطلب عبر واتساب'}
+              {isSubmitting ? 'جاري تجهيز الطلب...' : 'إرسال الطلب عبر واتساب'}
             </span>
           </button>
 
           <p className="text-[10px] text-center text-slate-500 mt-2">
-            {import.meta.env.VITE_STATIC_PREVIEW === 'true'
-              ? 'هذه الصفحة للعرض فقط؛ يتطلب تسجيل الطلب تشغيل الخادم وقاعدة البيانات.'
-              : 'بالنقر على الزر، سيتم توليد رقم الطلب المرجعي وحفظه بالنظام وإرسال كافة البيانات لواتساب الإدارة فوراً.'}
+            بالنقر على الزر، سيتم توليد رقم الطلب المرجعي وحفظه بالنظام وإرسال كافة البيانات لواتساب الإدارة فوراً.
           </p>
         </div>
 

@@ -629,7 +629,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 <div className="text-[10px] text-slate-400 flex items-center gap-1">
                                   <span>الوسيلة:</span>
                                   <span className="font-bold text-slate-200">
-                                    بوابة Wayl (غير مفعّلة)
+                                    الدفع الإلكتروني
                                   </span>
                                 </div>
 

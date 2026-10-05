@@ -40,7 +40,7 @@ export const DetailedReceiptModal: React.FC<DetailedReceiptModalProps> = ({
   if (!isOpen) return null;
 
   const isPaid = order.paymentStatus === 'paid';
-  const payMethodName = 'بوابة Wayl (غير مفعّلة بعد)';
+  const payMethodName = 'الدفع الإلكتروني';
   const stageArabic = order.stage === 'stage_1' ? 'المرحلة الأولى' : order.stage === 'stage_2' ? 'المرحلة الثانية' : order.stage === 'stage_3' ? 'المرحلة الثالثة' : order.stage === 'stage_4' ? 'المرحلة الرابعة' : 'الدراسات العليا';
 
   const receiptPlainText = `
@@ -79,10 +79,10 @@ ${order.additionalFees?.length ? `• الإضافات: ${order.additionalFees.m
 • خصم النقاط: ${formatIqd(order.pointsDiscountIqd || 0)}
 • الإجمالي النهائي: ${formatIqd(order.totalPriceIqd)}
 • طريقة الدفع: ${payMethodName}
-• مرجع العملية: ${order.paymentReference || 'سداد مباشر'}
+• مرجع العملية: ${order.paymentReference || 'بانتظار تأكيد الدفع'}
 
 ملاحظات:
-• تتم مراجعة حالة الدفع يدوياً من الإدارة
+• حالة السداد موضحة أعلاه
 ══════════════════════════════════════
 `;
 

@@ -44,7 +44,7 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
   const [reviewSubmitted, setReviewSubmitted] = useState(!!order.rating);
 
   const handleContactPaymentSupport = () => {
-    const message = `أرغب بالاستفسار عن الدفع لطلبي ${order.orderNumber}\nالطالب: ${order.studentName || 'غير محدد'}\nالمبلغ: ${formatIqd(order.totalPriceIqd)}\nبوابة Wayl غير مفعّلة حالياً.`;
+    const message = `أرغب بالاستفسار عن الدفع لطلبي ${order.orderNumber}\nالطالب: ${order.studentName || 'غير محدد'}\nالمبلغ: ${formatIqd(order.totalPriceIqd)}\nيرجى تزويدي بطريقة الدفع المتاحة.`;
     window.open(getWhatsAppUrl(message), '_blank', 'noopener,noreferrer');
     setShowPaymentModal(false);
   };
@@ -699,8 +699,8 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
 
             <div className="space-y-4 text-xs">
               <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
-                <span className="block font-bold text-slate-900">الدفع عبر Wayl غير متاح حالياً</span>
-                <span className="block text-[11px] text-slate-600">لم يتم ربط بوابة الدفع بالخادم بعد. لن تتغير حالة الطلب إلى مدفوع عبر إدخال مرجع يدوي.</span>
+                <span className="block font-bold text-slate-900">تواصل مع الدعم لإتمام الدفع</span>
+                <span className="block text-[11px] text-slate-600">لا ترسل بيانات البطاقة أو كلمة المرور عبر المحادثات.</span>
               </div>
 
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-950 flex items-center gap-2">

@@ -41,7 +41,7 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
 
   const receiptNumber = `REC-${order.orderNumber.replace(/[^0-9]/g, '') || Date.now().toString().slice(-6)}`;
   const isPaid = order.paymentStatus === 'paid';
-  const payMethodTitle = 'بوابة Wayl (غير مفعّلة بعد)';
+  const payMethodTitle = 'الدفع الإلكتروني';
 
   const handleCopyReceipt = () => {
     const text = 
@@ -66,7 +66,7 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
 ${order.additionalFees?.length ? `الإضافات: ${order.additionalFees.map(fee => `${fee.label} (${formatIqd(fee.amountIqd)})`).join('، ')}` : ''}
 💳 وسيلة الدفع: ${payMethodTitle}
 حالة السداد: ${isPaid ? 'تم تأكيده من الإدارة ✅' : 'بانتظار تأكيد الإدارة ⏳'}
-المرجع المالي: ${order.paymentReference || '---'}
+المرجع المالي: ${order.paymentReference || 'بانتظار تأكيد الدفع'}
 ━━━━━━━━━━━━━━━━━━━
 الإضافات: ${order.additionalFees?.map(fee => `${fee.label}: ${formatIqd(fee.amountIqd)}`).join('، ') || 'لا توجد'}
 منصة المنقذ الجامعي`;
